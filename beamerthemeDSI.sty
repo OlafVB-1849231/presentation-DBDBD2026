@@ -1,0 +1,314 @@
+%%%%%%%%%%——————————————-%%%%%%%%%%%%
+%                             File created: 23 February, 2023
+%This style-file can be used in combination with the beamer documentclass.
+%For more information on beamer, check the documentation
+%https://tug.ctan.org/macros/latex/contrib/beamer/doc/beameruserguide.pdf
+
+%for the 16:9 format start with
+
+%\documentclass[aspectratio=169]{beamer}
+%\usetheme{DSI}
+%%%%%%%%%——————————————-%%%%%%%%%%%%
+
+%%% Defining the preamble
+
+\mode<all>
+\usepackage{xcolor}
+\usepackage{tikz}
+\newcommand*\circled[1]{\tikz[baseline=(char.base)]{
+            \node[shape=circle,draw,inner sep=1pt,fill=UHred] (char) {\textcolor{UHwhite}{#1}};}}
+            
+
+
+%%%%%%%%%%%%%%
+%%
+%% Color theme
+%%
+%%%%%%%%%%%%%%
+
+%DSI Primary colors
+\definecolor{UHred}{RGB}{224,60,49}
+\definecolor{UHblack}{RGB}{28,29,26}
+\definecolor{UHwhite}{RGB}{255,255,255}
+
+%DSI Secondary color shades
+\definecolor{red1}{HTML}{A82B20}
+\definecolor{red2}{HTML}{691B14}
+\definecolor{red3}{HTML}{F53F2F}
+\definecolor{red4}{HTML}{CF3527}
+
+
+\setbeamercolor{structure}{fg=UHwhite,bg=UHred}
+
+% This sets the colour of the title of the presentation and titles of all the slides in the presentation to red.
+\setbeamercolor{frametitle}{fg = UHred}
+\setbeamercolor{title}{fg = UHred}
+
+% In case you choose to display the Table of Contents, or the Outline slide.
+\setbeamercolor{section in toc}{fg = UHblack}
+\setbeamercolor{section in toc shaded}{fg = UHblack}
+
+% The colour of all the items, subitems and and subsubitems are set to black.
+\setbeamercolor{item}{fg = UHblack}
+\setbeamercolor{subitem}{fg = UHblack}
+\setbeamercolor{subsubitem}{fg = UHblack}
+
+% This sets the color for each item heading of the description environment.
+\setbeamercolor{description item}{fg = UHblack}
+
+% NOTE: Setting the color black for all the items also sets in black for other environemnts like enumerate.
+
+% We also need to fix the colours for captions for figures and tables.
+\setbeamercolor{caption}{fg = UHblack}
+\setbeamercolor{caption name}{fg = UHblack}
+
+% In addition, we can also change the background colour of the slides depending on your requirement.
+\setbeamercolor{background canvas}{bg = UHwhite}
+%\setbeamertemplate{background canvas}{image} %to include image in background
+
+%%%%%%
+% There are three types of boxes in beamer:
+% 1. Simple, or standard block, which can be invoked using definition or theorem
+% 2. Alert block
+% 3. Example block
+% We will customize all these blocks based on our requirements
+
+\setbeamertemplate{blocks}[rounded][shadow=false]
+
+% Standard block
+\setbeamercolor{block title}{bg = UHred,fg = UHwhite}
+\setbeamercolor{block body}{bg = UHred!20}
+
+% Alert block
+\setbeamercolor{block title alerted}{bg = red1,fg = UHwhite}
+\setbeamercolor{block body alerted}{bg = red1!20}
+
+% Example block
+\setbeamercolor{block title example}{bg = UHblack,fg = UHwhite}
+\setbeamercolor{block body example}{bg = UHblack!10}
+
+%%%%%%
+% And one final thing, the colour of the text
+\setbeamercolor{normal text}{fg = UHblack}
+
+%%%%%%%%%%%%%%
+%%
+%% Font theme
+%%
+%%%%%%%%%%%%%%
+
+%%%%%%
+% Here we are using default fonts
+\usefonttheme{professionalfonts}
+
+
+% Font for the presentation title
+\setbeamerfont{title}{size = \huge}
+
+% Font of the frame titles
+\setbeamerfont{frametitle}{size = \Large}
+
+
+%%%%%%%%%%%%%%
+%%
+%% Inner theme
+%%
+%%%%%%%%%%%%%%
+
+
+%%%%%%
+% You can change the specific details by editing that particular option as we have done below.
+\useinnertheme{circles}
+
+% To change a specific inner part
+%\setbeamertemplate{itemize items}[triangle]
+
+
+
+
+%%%%%%%%%%%%%%
+%%
+%% Outer theme
+%%
+%%%%%%%%%%%%%%
+
+
+
+
+
+%%%%%%
+% In the outer theme, we will try to do the following:
+% 1. Change the headline by putting a logo and a horizontal line
+% 2. Change the footline and include custom information depending on our requirements
+% 3. Organize the presentation title and the frame titles
+
+
+%%%%%%
+% Headline
+% First the horizontal line on the top portion of the slides
+% Add a horizontal line that runs from left of the slide to the right, just below the logo.
+\newcommand{\LogoLine}{%
+\raisebox{-12mm}[0pt][0pt]{%
+\begin{pgfpicture}{0mm}{0mm}{0mm}{0mm}
+\pgfsetlinewidth{0.28mm}
+\color{UHred}
+\pgfline{\pgfpoint{-3mm}{1mm}}{\pgfpoint{10.8cm}{1mm}}
+\end{pgfpicture}}}
+
+
+% Include the line that we just created in the headline
+\setbeamertemplate{headline}[text line]{\LogoLine}
+
+
+% Adding the logo 
+\setbeamertemplate{sidebar canvas right}{
+\vspace*{3pt}\hspace*{-50pt}%
+{\includegraphics[height=35pt]{Logo/DSI_Logo.png}}}
+
+%%(If you want a research group specific logo, uncomment lines 169-171, comment line 164-166, and replace the name with the desired logo( DSI_ACSL, DSI_BIOMED, DSI_CENSTAT, DSI_CMAT, DSI_CORE, DSI_DBTI, DSI_ECOOM, DSI_READSEARCH, DSI_REVAL, NEW_DSI_TLAB)
+%\setbeamertemplate{sidebar canvas right}{
+%\vspace*{3pt}\hspace*{-90pt}%
+%{\includegraphics[height=35pt]{Logo/DSI_CENSTAT.png}}}
+
+
+
+%%%%%
+%Orienting the frametitles above the line
+\setbeamertemplate{frametitle}{
+\vspace*{4mm}\hspace*{-2mm}\insertframetitle}
+
+
+%%%%%
+% footline
+\newcommand{\Ffootline}{%
+%\parbox[t]{24.6cm}{\UHred{\rule{24.6cm}{0.05cm}}}\newline
+\inserttitle % The left end of the footline
+\hfill
+\textit{\insertauthor} % The center
+\hfill
+\circled{\textbf{\insertframenumber}}} % And the right end
+
+
+
+\setbeamertemplate{footline}{%
+\usebeamerfont{structure}
+\begin{beamercolorbox}[wd=\paperwidth,ht=4.25ex,dp=2ex]{title in head/foot}%
+\textcolor{UHred}{\rule{\paperwidth}{2pt}}
+\footnotesize\hspace*{4mm} \Ffootline \hspace{4mm}
+\end{beamercolorbox}}
+%%%%%%
+% removing the navigation symbols
+\setbeamertemplate{navigation symbols}{}
+%%%%%%
+%Here we change the view of the itemize and enumerate bullets
+\setbeamertemplate{enumerate items}[circle,red]
+\setbeamercolor*{item projected}{bg=UHred,fg=white}
+\setbeamercolor*{subitem projected}{bg=UHblack,fg=white}
+
+\setbeamertemplate{itemize item}{\color{UHred}$\blacktriangleright$}
+\setbeamertemplate{itemize subitem}{\color{UHblack}$\blacktriangleright$}
+
+
+
+
+
+% Now let’s create commands for the title etc., that we can call later
+
+% Title
+\newcommand{\MyTitle}{%
+%\hspace*{60mm}\vspace{-25mm}
+\textcolor{UHred}{\textbf{\inserttitle}}}
+
+% Subtitle
+\newcommand{\MySubTitle}{%
+%\hspace*{60mm}\vspace{-25mm}
+\footnotesize \textit{\insertsubtitle}}
+
+% Author
+\newcommand{\MyAuthor}{
+%\hspace*{60mm}\vspace{-25mm}
+\textcolor{red1}{\insertauthor}}
+
+% Institute
+\newcommand{\MyInstitute}{
+%\hspace*{60mm}\vspace{-25mm}
+\footnotesize \textit{\insertinstitute}}
+
+
+% Date
+\newcommand{\MyDate}{
+%\hspace*{60mm}\vspace{-25mm}
+ \insertdate}
+
+
+
+% We declare the image that will be used as the background of the page
+\pgfdeclareimage[width = \paperwidth]{titlebackground}{TitleBackground.pdf}
+
+
+
+% Title page
+\setbeamertemplate{title page}{
+\thispagestyle{empty}
+\begin{picture}(0,0)
+	\put(-28,-156){%
+		\pgfuseimage{titlebackground}
+	}
+	
+	\put(0,82){%
+		\parbox[t]{0.58\textwidth}{%
+			\raggedright\fontsize{17.28}{19}\selectfont\MyTitle\par
+		}%
+	}
+	\put(0,35){
+		%
+		\begin{beamercolorbox}[wd=0.5\textwidth,ht=0.03\paperwidth]{Title}
+			\usebeamerfont{Title}%
+			{\large \MySubTitle}
+		\end{beamercolorbox}
+	}
+	\put(0,0){%
+		\parbox[t]{0.55\textwidth}{%
+			\raggedright
+			{\large\MyAuthor\par}
+			\vspace{5pt}
+			{\small\collaboration\par}
+			\vspace{7pt}
+			{\MyInstitute\par}
+			\vspace{12pt}
+			{\footnotesize\MyDate\par}
+		}%
+	}
+
+	\end{picture}
+	
+}
+
+
+
+%Automatically gives sections a title page
+
+
+% this creates a separate page for each section title
+\AtBeginSection[]{
+  \begin{frame}
+  \vfill
+  \centering
+  \begin{beamercolorbox}[sep=8pt,center,shadow=true,rounded=true]{title}
+    {\large\textbf{\textcolor{UHwhite}{\insertsectionhead}}}\par%
+  \end{beamercolorbox}
+  \vfill
+  \end{frame}
+}
+
+%To show the table of contents between sections with the current title highlighted, you can uncomment the following lines.
+
+%\AtBeginSubsection[]
+%{
+%    \begin{frame}
+%        \frametitle{Table of Contents}
+%        \tableofcontents[currentsection,currentsubsection]
+%    \end{frame}
+%}
+
+\mode<all>

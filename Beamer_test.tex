@@ -1,0 +1,255 @@
+\documentclass[aspectratio=169,10pt]{beamer}
+\usetheme{DSI}
+
+\usepackage{listings}
+\lstdefinestyle{slidesql}{
+  language=SQL,
+  morekeywords={WITH,RECURSIVE},
+  basicstyle=\ttfamily\small\color{UHblack},
+  keywordstyle=\color{red1}\bfseries,
+  commentstyle=\color{UHblack!55}\itshape,
+  stringstyle=\color{red2},
+  identifierstyle=\color{UHblack},
+  columns=fullflexible,
+  keepspaces=true,
+  showstringspaces=false
+}
+
+
+
+%%If you want the change the logo to your research group logo, follow the steps in line 168 of beamerthemeDSI.sty. If you want no logo you can just comment lines 164-166
+
+\title{Analyzing loop hoisting optimizations for recursive SQL queries}
+\author{Olaf Van Bylen}
+\newcommand{\collaboration}{In collaboration with Frank Neven, Brecht Vandevoort and Stijn Vansummeren}
+% \institute{Data Science Institute - Hasselt University}
+\date{December 4, 2026}
+
+% Card spacing can be adjusted locally without losing automatic text sizing.
+\newcommand{\motivationtitlefont}{\large\bfseries}
+\newcommand{\motivationbodyfont}{\small}
+\newcommand{\motivationpadding}{10pt}
+\newcommand{\motivationgap}{8pt}
+\newcommand{\motivationtextgap}{4pt}
+
+% Cards size themselves to the wrapped title and body, with consistent padding.
+\newcommand{\motivationcard}[3]{%
+  \par\noindent
+  \begin{tikzpicture}
+    \node[fill=#3,draw=UHblack!9,rounded corners=4pt,
+      text width=\dimexpr\linewidth-0.8cm-1pt\relax,
+      inner xsep=0.4cm,inner ysep=\motivationpadding,outer sep=0pt,
+      align=left,font=\motivationbodyfont] (card) {%
+      {\color{UHblack}\motivationtitlefont #1\par}
+      \vspace{\motivationtextgap}
+      {\color{UHblack!75}#2\par}%
+    };
+    \draw[UHred,line width=2pt,line cap=round]
+      ([xshift=1pt,yshift=-8pt]card.north west) --
+      ([xshift=1pt,yshift=8pt]card.south west);
+  \end{tikzpicture}%
+  \par\addvspace{\motivationgap}
+}
+
+\begin{document}
+% --------------------------------------------------- Slide --
+\begin{frame}
+  \titlepage
+\end{frame}
+
+\begin{frame}{Contents}
+ \tableofcontents
+\end{frame}
+
+\begin{frame}{Motivation}
+\renewcommand{\motivationtitlefont}{\normalsize\bfseries}
+\renewcommand{\motivationbodyfont}{\footnotesize}
+\renewcommand{\motivationpadding}{6pt}
+\renewcommand{\motivationgap}{5pt}
+\renewcommand{\motivationtextgap}{2pt}
+\centering
+\begin{minipage}{0.94\textwidth}
+  \motivationcard{Regular path queries}
+    {Describe graph paths using regular expressions over edge labels.}{UHblack!3}
+  \motivationcard{Datalog\textsuperscript{$\circ$}}
+    {Combine recursion with aggregation over semirings, e.g., shortest paths using min and addition.}{UHblack!3}
+  \motivationcard{Rel}
+    {Relational AI's language: recursive by design}{UHblack!3}
+\end{minipage}
+\par
+\begin{tikzpicture}
+  \draw[-latex,UHred,line width=1.5pt] (0,0.45) -- (0,0);
+\end{tikzpicture}
+\par\vspace{3pt}
+\begin{tikzpicture}
+  \node[fill=UHred!6,draw=UHred!40,rounded corners=4pt,
+    text width=\dimexpr\textwidth-0.8cm-1pt\relax,
+    inner xsep=0.4cm,inner ysep=9pt,align=center] {%
+    {\color{red1}\large\bfseries Recursion within SQL\par}
+    \vspace{3pt}
+    {\small Express these computations in SQL and optimize their execution.\par}
+  };
+\end{tikzpicture}
+% Rel: A Programming Language for Relational Data -- Aref et al., SIGMOD 2025.
+\end{frame}
+
+\begin{frame}{Why optimize recursive SQL?}
+\vspace{0.6em}
+{\small\color{UHblack!75}A recursive step repeats. Work independent of the recursion need not.\par}
+\vspace{0.8em}
+{\small\textbf{Example:} Find routes using only approved airlines.\par}
+\vspace{0.7em}
+\begin{columns}[T,onlytextwidth]
+  \begin{column}{0.485\textwidth}
+    \motivationcard{Repeated work}
+      {At each iteration:\par
+       build eligible flights;\par
+       extend the current routes.}{UHblack!3}
+  \end{column}
+  \begin{column}{0.485\textwidth}
+    \motivationcard{Loop hoisting}
+      {Once: build eligible flights.\par
+       Each iteration: extend routes\par
+       using the prepared relation.}{UHred!6}
+  \end{column}
+\end{columns}
+\vspace{0.5em}
+\motivationcard{When is loop hoisting correct and beneficial?}
+  {Identify invariant work, preserve SQL semantics, and measure the performance impact.}{UHblack!3}
+% Illustrative execution strategies, not a claim about every SQL optimizer.
+% Recursive evaluation reference: PostgreSQL documentation, section 7.8.2.
+% https://www.postgresql.org/docs/current/queries-with.html
+\end{frame}
+
+\begin{frame}{Recursion in SQL}
+\vspace{0.8em}
+\renewcommand{\motivationpadding}{5pt}
+\renewcommand{\motivationgap}{5pt}
+\renewcommand{\motivationtitlefont}{\normalsize\bfseries}
+\motivationcard{Recursive queries through recursive Common Table Expressions (CTEs)}
+  {Part of the SQL standard since \textbf{SQL:1999}.\par}{UHblack!3}
+\vspace{0.5em}
+\centering
+\motivationcard{Transitive closure}
+  {{\ttfamily\small
+  \begin{tabular}{@{}l@{}}
+  \lstinline[style=slidesql]|WITH RECURSIVE tc(src, dst) AS (|\\
+  \quad \lstinline[style=slidesql]|-- Anchor: direct edges|\\
+  \quad \lstinline[style=slidesql]|SELECT src, dst FROM edge|\\
+  \quad \lstinline[style=slidesql]|UNION|\\
+  \quad \lstinline[style=slidesql]|-- Recursion: extend by one edge|\\
+  \quad \lstinline[style=slidesql]|SELECT tc.src, e.dst|\\
+  \quad \lstinline[style=slidesql]|FROM tc JOIN edge e ON tc.dst = e.src|\\
+  \lstinline[style=slidesql]|)|\\
+  \lstinline[style=slidesql]|SELECT src, dst FROM tc;|
+  \end{tabular}}\par
+  \vspace{4pt}
+  {}}{UHred!6}
+
+% \begin{tikzpicture}[
+%   stage/.style={draw=UHblack!9,fill=UHblack!3,rounded corners=4pt,
+%     text width=3.5cm,minimum height=1.3cm,inner sep=6pt,align=center},
+%   flow/.style={-latex,UHred,line width=1.2pt}]
+%   \node[stage] (anchor) at (2.0,0) {%
+%     {\normalsize\bfseries Anchor term}\\[4pt]
+%     {\footnotesize Produce the initial rows.}};
+%   \node[stage,fill=UHred!6] (recursive) at (6.9,0) {%
+%     {\normalsize\bfseries Recursive term}\\[4pt]
+%     {\footnotesize Extend the latest rows.}};
+%   \node[stage] (delta) at (11.8,0) {%
+%     {\normalsize\bfseries Next working table}\\[4pt]
+%     {\footnotesize Collect the next batch.}};
+%   \draw[flow] (anchor.east) -- (recursive.west);
+%   \draw[flow] (recursive.east) -- (delta.west);
+%   \draw[flow] (delta.south) -- ++(0,-0.4)
+%     -| node[pos=0.25,below,font=\footnotesize,text=UHblack!75]
+%     {Repeat while nonempty} (recursive.south);
+% \end{tikzpicture}
+% \par\vspace{0.4em}
+% \motivationcard{Semi-naive evaluation: process only the latest delta}
+%   {Each iteration uses the previous round's new rows, rather than the full accumulated result.\par
+%    {\footnotesize With \texttt{UNION}, discard duplicates and previously found rows; \texttt{UNION ALL} retains duplicates.}}{UHred!6}
+% {\par\raggedright\tiny\color{UHblack!60}
+% Sources: \href{https://www.postgresql.org/docs/current/queries-with.html\#QUERIES-WITH-RECURSIVE}{PostgreSQL, section 7.8.2} (linear recursion);
+% \href{https://zedware.github.io/homepage/db/sql99-known-as-sql3.pdf}{SQL:1999, formerly known as SQL3}.\par}
+\end{frame}
+
+\section{Section 1: text}
+\begin{frame}
+\frametitle{My first frametitle}
+Welcome to this DSI Latex Beamer template!
+\vspace{2cm}
+\\You can adjust the view of the section titles to repeating the table of contents with the current section highlighted. For this, follow the steps in line 316 of beamerthemeDSI.sty.
+\end{frame}
+
+\begin{frame}
+You can also leave out a frametitle. The primary colors that you can use are
+\begin{itemize}
+\item \textcolor{UHred}{UHred}
+\item \textcolor{UHblack}{UHblack}
+\item \colorbox{UHblack}{\textcolor{UHwhite}{UHwhite}}
+\end{itemize}
+
+The secondary colors are 
+\begin{itemize}
+\item \textcolor{red1}{red1}
+\item \textcolor{red2}{red2}
+\item \textcolor{red3}{red3}
+\item \textcolor{red4}{red4}
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Itemization}
+\begin{itemize}
+\item Item 1
+\item Item 2
+\begin{itemize}
+\item Item 2.1
+\item Item 2.2
+\end{itemize}
+\item Item 3
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Enumeration}
+\begin{enumerate}
+\item Item 1
+\item Item 2
+\begin{enumerate}
+\item Item 2.1
+\item Item 2.2
+\end{enumerate}
+\item Item 3
+\end{enumerate}
+\end{frame}
+
+\section{Section 2: Blocks}
+
+\subsection{Normal block}
+\begin{frame}
+Here is a normal block:
+
+\begin{block}{Block title}
+block body
+\end{block}
+\end{frame}
+
+\subsection{Example block}
+\begin{frame}
+Here is an example block:
+
+\begin{exampleblock}{Block title}
+block body
+\end{exampleblock}
+\end{frame}
+
+
+\subsection{Alert block}
+\begin{frame}
+Here is an alertblock:
+
+\begin{alertblock}{Block title}
+block body
+\end{alertblock}
+\end{frame}
+\end{document}
