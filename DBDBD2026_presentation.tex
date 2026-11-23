@@ -301,6 +301,71 @@
 \end{tikzpicture}
 \end{frame}
 
+\begin{frame}{Combining deduplication and anti join}
+\renewcommand{\motivationpadding}{7pt}
+\renewcommand{\motivationtitlefont}{\normalsize\bfseries}
+\begin{columns}[c,onlytextwidth]
+\begin{column}{0.49\textwidth}
+\motivationcard{Join plan}
+  {\centering
+  \begin{tikzpicture}[text=UHblack,
+    every node/.style={font=\footnotesize,inner sep=3pt},
+    plan edge/.style={draw=UHblack!75,line width=0.8pt}]
+    % Reserve the same space throughout the transformation.
+    \path[use as bounding box] (-0.25,0.4) rectangle (5,-3.1);
+    \node[font=\Large] (combinejoin) at (1.1,-1.75) {$\bowtie$};
+    \node (combineedge) at (0.2,-2.65) {\texttt{edge}};
+    \node (combinedelta) at (2.0,-2.65) {$\delta TC$};
+    \node (combinetc) at (3.8,-0.9) {$TC$};
+    \draw[plan edge] (combinejoin) -- (combineedge);
+    \draw[plan edge] (combinejoin) -- (combinedelta);
+    \only<1-2>{%
+      \tikzset{combine highlight/.style={}}
+      \only<2>{\tikzset{combine highlight/.style={
+        fill=UHred!12,draw=UHred,rounded corners=3pt}}}
+      \node[font=\Large,combine highlight] (combineanti) at (2.2,0)
+        {$\triangleleft$};
+      \node[align=center,combine highlight] (combinededup) at (1.1,-0.9)
+        {deduplicate\\(aggregate)};
+      \node[font=\scriptsize,text=UHblack!65,anchor=west]
+        at (2.55,0) {left anti join};
+      \draw[plan edge] (combineanti) -- (combinededup);
+      \draw[plan edge] (combineanti) -- (combinetc);
+      \draw[plan edge] (combinededup) -- (combinejoin);
+    }
+    \only<3->{%
+      \node[align=center,fill=UHred!12,draw=UHred,
+        rounded corners=3pt,inner sep=6pt] (combinedoperator) at (2.2,-0.15)
+        {{\normalsize\bfseries AAJ}\\{\scriptsize AggregatAntiJoin}};
+      \draw[plan edge] (combinedoperator) -- (combinejoin);
+      \draw[plan edge] (combinedoperator) -- (combinetc);
+    }
+  \end{tikzpicture}\par
+  }{UHred!6}
+\end{column}
+\begin{column}{0.46\textwidth}
+\uncover<2->{%
+\motivationcard{Two membership checks}
+  {{\small
+  \textbf{Deduplicate:} Has this pair already been produced in this iteration?\par
+  \vspace{5pt}
+  \textbf{Left anti join:} Is this pair already in $TC$?
+  }}{UHblack!3}
+}
+\uncover<3->{%
+\motivationcard{One shared hash set}
+  {{\small
+  Initialize the set with $TC$.\par
+  For each candidate, check and insert.\par
+  Emit the pair into $\delta TC$ only if it was newly inserted.
+  \par\vspace{5pt}
+  Similar to a \textbf{GroupJoin}.
+  }}{UHred!6}
+}
+\end{column}
+\end{columns}
+\end{frame}
+
 \section{TODO: rest van de presentatie}
 \begin{frame}
 \frametitle{My first frametitle}
