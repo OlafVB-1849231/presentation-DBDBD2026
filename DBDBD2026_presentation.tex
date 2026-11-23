@@ -90,7 +90,7 @@
   \motivationcard{Datalog\textsuperscript{$\circ$}}
     {Combine recursion with aggregation over semirings, e.g., shortest paths using min and addition.}{UHblack!3}
   \motivationcard{Rel}
-    {Relational AI's language: recursive by design}{UHblack!3}
+    {Declarative programming language: recursive by design}{UHblack!3}
 \end{minipage}
 \par
 \begin{tikzpicture}
@@ -103,7 +103,7 @@
     inner xsep=0.4cm,inner ysep=9pt,align=center] {%
     {\color{red1}\large\bfseries Recursion within SQL\par}
     \vspace{3pt}
-    {\small Express these computations in SQL and optimize their execution.\par}
+    {\small Express these computations recursively in SQL and optimize their execution.\par}
   };
 \end{tikzpicture}
 % Rel: A Programming Language for Relational Data -- Aref et al., SIGMOD 2025.
@@ -138,52 +138,61 @@
 % \end{frame}
 
 \begin{frame}{Recursion in SQL}
-\vspace{0.8em}
+\vspace{0.2em}
 \renewcommand{\motivationpadding}{5pt}
 \renewcommand{\motivationgap}{5pt}
 \renewcommand{\motivationtitlefont}{\normalsize\bfseries}
-\motivationcard{Recursive queries through recursive Common Table Expressions (CTEs)}
-  {Part of the SQL standard since \textbf{SQL:1999}.\par}{UHblack!3}
-\vspace{0.5em}
 \begin{columns}[T,onlytextwidth]
 \begin{column}{0.52\textwidth}
-\motivationcard{Transitive closure}
+\motivationcard{Recursive CTEs}
   {{\ttfamily\footnotesize
   \begin{tabular}{@{}l@{}}
-  \lstinline[style=slidesqlcompact]|WITH RECURSIVE tc(src, dst) AS (|\\
-  \quad \lstinline[style=slidesqlcompact]|-- Anchor:| {\color{UHblack!55}\itshape q\textsubscript{a}}\\
-  \quad \lstinline[style=slidesqlcompact]|SELECT src, dst FROM edge|\\
-  \quad \lstinline[style=slidesqlcompact]|UNION|\\
-  \quad \lstinline[style=slidesqlcompact]|-- Recursive term:| {\color{UHblack!55}\itshape q\textsubscript{r}}\\
-  \quad \lstinline[style=slidesqlcompact]|SELECT tc.src, e.dst|\\
-  \quad \lstinline[style=slidesqlcompact]|FROM tc JOIN edge e|\\
-  \qquad \lstinline[style=slidesqlcompact]|ON tc.dst = e.src|\\
-  \lstinline[style=slidesqlcompact]|)|\\
-  \lstinline[style=slidesqlcompact]|SELECT src, dst FROM tc;|
+  \lstinline[style=slidesqlcompact]|WITH RECURSIVE R(A,B,...) AS (|\\
+  \quad $Q_a$ \lstinline[style=slidesqlcompact]|UNION| $Q_r$\\
+  \lstinline[style=slidesqlcompact]|)|
   \end{tabular}}\par
   \vspace{4pt}
-  {}}{UHred!6}
-\end{column}
-\begin{column}{0.46\textwidth}
-\motivationcard{Semi-naive Evaluation}
+  \uncover<2->{%
+  {\footnotesize
+  \textbf{For transitive closure:}\par
+  \begin{tabular}{@{}l@{\ }l@{}}
+  $Q_a =$ & \lstinline[style=slidesqlcompact]|SELECT src, dst FROM edge|\quad $\sim \texttt{edge}$\\[3pt]
+  $Q_r =$ & \lstinline[style=slidesqlcompact]|SELECT tc.src, e.dst|\quad $\sim TC \bowtie \texttt{edge}$\\
+          & \lstinline[style=slidesqlcompact]|FROM tc JOIN edge e|\\
+          & \lstinline[style=slidesqlcompact]|ON tc.dst = e.src|
+  \end{tabular}\par
+  }}}{UHred!6}
+\uncover<3->{%
+\motivationcard{Semantics (naive evaluation)}
   {{\footnotesize
   \begin{tabular}{@{}l@{}}
-  $\delta TC \leftarrow \operatorname{deduplicate}(q_a(\texttt{edge}))$\\
-  $RT \leftarrow \delta TC$\\[4pt]
+  $WT \leftarrow \varnothing$\\
+  $TC \leftarrow \texttt{edge}$\\[4pt]
+  \textbf{while} $|TC| > |WT|$ \textbf{do}\\
+  \quad $WT \leftarrow TC$\\
+  \quad $TC \leftarrow \texttt{edge} \cup (\texttt{edge} \bowtie TC$)\\
+  \textbf{end}
+  \end{tabular}
+  }}{UHblack!3}
+}
+\end{column}
+\begin{column}{0.46\textwidth}
+\uncover<4->{%
+\motivationcard{Semi-naive evaluation}
+  {{\footnotesize
+  \begin{tabular}{@{}l@{}}
+  $\delta TC \leftarrow \operatorname{deduplicate}(\texttt{edge})$\\
+  $TC \leftarrow \delta TC$\\[4pt]
   \textbf{while} $\delta TC \ne \varnothing$\\
-  \quad $IT \leftarrow \operatorname{deduplicate}(q_r(\texttt{edge}, \delta TC)) - RT$\\
-  \quad $RT \leftarrow RT \cup IT$\\
-  \quad $\delta TC \leftarrow IT$\\
+  \quad $\delta TC \leftarrow \operatorname{deduplicate}(\texttt{edge} \bowtie \delta TC) - TC$\\
+  \quad $TC \leftarrow TC \cup \delta TC$\\
   \textbf{end}\\[4pt]
-  \textbf{return} $RT$
   \end{tabular}\par
   \vspace{5pt}
   \begin{tabular}{@{}l@{\quad}l@{}}
-  $\delta TC$: & working table\\
-  $IT$: & intermediate table\\
-  $RT$: & result table
   \end{tabular}
   }}{UHblack!3}
+}
 \end{column}
 \end{columns}
 
@@ -216,35 +225,30 @@
 \end{frame}
 
 \begin{frame}{Adding loop hoisting optimizations}
+\tikzset{delta highlight/.style={fill=UHblack!3}}
+\only<2->{\tikzset{delta highlight/.style={fill=UHred!10}}}
 \renewcommand{\motivationpadding}{5pt}
 \renewcommand{\motivationgap}{5pt}
 \renewcommand{\motivationtitlefont}{\normalsize\bfseries}
 \begin{columns}[c,onlytextwidth]
 \begin{column}{0.48\textwidth}
-\motivationcard{Semi-naive Evaluation}
+\motivationcard{Semi-naive evaluation}
   {{\footnotesize
   \begin{tabular}{@{}l@{}}
-  $\delta TC \leftarrow \operatorname{deduplicate}(q_a(\texttt{edge}))$\\
-  $RT \leftarrow \delta TC$\\[4pt]
+  $\delta TC \leftarrow \operatorname{deduplicate}(\texttt{edge})$\\
+  $TC \leftarrow \delta TC$\\[4pt]
   \textbf{while} $\delta TC \ne \varnothing$\\
-  \quad \tikz[remember picture,baseline=(itstep.base)]{
-    \node[fill=UHred!10,rounded corners=2pt,
-      inner xsep=3pt,inner ysep=2pt,outer sep=0pt] (itstep)
-      {$IT \leftarrow \operatorname{deduplicate}(q_r(\texttt{edge}, \delta TC)) - RT$};}\\
-  \quad $RT \leftarrow RT \cup IT$\\
-  \quad $\delta TC \leftarrow IT$\\
+  \quad \tikz[remember picture,baseline=(deltastep.base)]{
+    \node[delta highlight,rounded corners=2pt,
+      inner xsep=3pt,inner ysep=2pt,outer sep=0pt] (deltastep)
+      {$\delta TC \leftarrow \operatorname{deduplicate}(\texttt{edge} \bowtie \delta TC) - TC$};}\\
+  \quad $TC \leftarrow TC \cup \delta TC$\\
   \textbf{end}\\[4pt]
-  \textbf{return} $RT$
-  \end{tabular}\par
-  \vspace{5pt}
-  \begin{tabular}{@{}l@{\quad}l@{}}
-  $\delta TC$: & working table\\
-  $IT$: & intermediate table\\
-  $RT$: & result table
   \end{tabular}
   }}{UHblack!3}
 \end{column}
 \begin{column}{0.44\textwidth}
+\uncover<2->{%
 \begin{tikzpicture}[remember picture]
   \node[fill=UHred!6,draw=UHblack!9,rounded corners=4pt,
     text width=\dimexpr\linewidth-0.8cm-1pt\relax,
@@ -257,13 +261,16 @@
       every node/.style={font=\footnotesize,inner sep=3pt},
       every path/.style={draw=UHblack!75,line width=0.8pt}]
       \node[font=\Large] (anti) at (2.2,0) {$\triangleleft$};
-      \node[align=center] (dedup) at (1.1,-0.9) {deduplicate\\(aggregate)};
-      \node (rt) at (3.8,-0.9) {$RT$};
+      \node[align=center] (dedup) at (1.1,-0.9) {%
+        \alt<3->{\underline{deduplicate}}{deduplicate\vphantom{\underline{deduplicate}}}\\
+        \alt<3->{\underline{(aggregate)}}{(aggregate)\vphantom{\underline{(aggregate)}}}};
+      \node (tc) at (3.8,-0.9) {$TC$};
       \node[font=\Large] (join) at (1.1,-1.75) {$\bowtie$};
-      \node (edge) at (0.2,-2.65) {\texttt{edge}};
+      \node (edge) at (0.2,-2.65) {%
+        \alt<3->{\underline{\texttt{edge}}}{\texttt{edge}\vphantom{\underline{\texttt{edge}}}}};
       \node (wt) at (2.0,-2.65) {$\delta TC$};
       \path (anti) -- (dedup);
-      \path (anti) -- (rt);
+      \path (anti) -- (tc);
       \path (dedup) -- (join);
       \path (join) -- (wt);
       \path (join) -- (edge);
@@ -272,7 +279,9 @@
     \end{tikzpicture}\par
   };
 \end{tikzpicture}
+}
 \par\vspace{0.3cm}
+\uncover<4->{%
 \begin{tikzpicture}[remember picture]
   \node[fill=UHred!6,draw=UHred!40,rounded corners=4pt,
     text width=\dimexpr\linewidth-0.8cm-1pt\relax,
@@ -281,13 +290,14 @@
     Hash join builds hash table on \texttt{edge}, reuse this accross iterations
   };
 \end{tikzpicture}
+}
 \end{column}
 \end{columns}
 \begin{tikzpicture}[remember picture,overlay]
-  \draw[-latex,UHred,line width=1.5pt,shorten >=2pt]
-    ([xshift=3pt]itstep.east) -- (joinplanbox.west |- itstep.east);
-  \draw[-latex,UHred,line width=1.2pt,shorten <=2pt,shorten >=2pt]
-    (edge.south) -- (hashreuse.north -| edge.south);
+  \only<2->{\draw[-latex,UHred,line width=1.5pt,shorten >=2pt]
+    ([xshift=3pt]deltastep.east) -- (joinplanbox.west |- deltastep.east);}
+  \only<4->{\draw[-latex,UHred,line width=1.2pt,shorten <=2pt,shorten >=2pt]
+    (edge.south) -- (hashreuse.north -| edge.south);}
 \end{tikzpicture}
 \end{frame}
 
