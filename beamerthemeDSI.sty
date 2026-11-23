@@ -181,10 +181,6 @@
 %%%%%
 % footline
 \newcommand{\Ffootline}{%
-%\parbox[t]{24.6cm}{\UHred{\rule{24.6cm}{0.05cm}}}\newline
-\inserttitle % The left end of the footline
-\hfill
-\textit{\insertauthor} % The center
 \hfill
 \circled{\textbf{\insertframenumber}}} % And the right end
 
@@ -193,7 +189,6 @@
 \setbeamertemplate{footline}{%
 \usebeamerfont{structure}
 \begin{beamercolorbox}[wd=\paperwidth,ht=4.25ex,dp=2ex]{title in head/foot}%
-\textcolor{UHred}{\rule{\paperwidth}{2pt}}
 \footnotesize\hspace*{4mm} \Ffootline \hspace{4mm}
 \end{beamercolorbox}}
 %%%%%%
