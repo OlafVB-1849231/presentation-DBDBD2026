@@ -1,6 +1,10 @@
 \documentclass[aspectratio=169,10pt]{beamer}
 \usetheme{DSI}
 
+% Remembered TikZ positions need another pass after the slide layout changes.
+\usepackage{rerunfilecheck}
+\RerunFileCheck{\jobname.aux}{}{Rerun to update TikZ arrow positions}
+
 \usepackage{listings}
 \lstdefinestyle{slidesql}{
   language=SQL,
@@ -13,6 +17,10 @@
   columns=fullflexible,
   keepspaces=true,
   showstringspaces=false
+}
+\lstdefinestyle{slidesqlcompact}{
+  style=slidesql,
+  basicstyle=\ttfamily\footnotesize\color{UHblack}
 }
 
 
@@ -58,7 +66,15 @@
 \end{frame}
 
 \begin{frame}{Contents}
- \tableofcontents
+  \begin{itemize}
+    \setlength{\itemsep}{0.7em}
+    \item Motivation
+    \item Recursion in SQL
+    \item Applying loop hoisting optimizations
+    \item Experiments
+    \item Analysis
+    \item Conclusion
+  \end{itemize}
 \end{frame}
 
 \begin{frame}{Motivation}
@@ -93,33 +109,33 @@
 % Rel: A Programming Language for Relational Data -- Aref et al., SIGMOD 2025.
 \end{frame}
 
-\begin{frame}{Why optimize recursive SQL?}
-\vspace{0.6em}
-{\small\color{UHblack!75}A recursive step repeats. Work independent of the recursion need not.\par}
-\vspace{0.8em}
-{\small\textbf{Example:} Find routes using only approved airlines.\par}
-\vspace{0.7em}
-\begin{columns}[T,onlytextwidth]
-  \begin{column}{0.485\textwidth}
-    \motivationcard{Repeated work}
-      {At each iteration:\par
-       build eligible flights;\par
-       extend the current routes.}{UHblack!3}
-  \end{column}
-  \begin{column}{0.485\textwidth}
-    \motivationcard{Loop hoisting}
-      {Once: build eligible flights.\par
-       Each iteration: extend routes\par
-       using the prepared relation.}{UHred!6}
-  \end{column}
-\end{columns}
-\vspace{0.5em}
-\motivationcard{When is loop hoisting correct and beneficial?}
-  {Identify invariant work, preserve SQL semantics, and measure the performance impact.}{UHblack!3}
-% Illustrative execution strategies, not a claim about every SQL optimizer.
-% Recursive evaluation reference: PostgreSQL documentation, section 7.8.2.
-% https://www.postgresql.org/docs/current/queries-with.html
-\end{frame}
+% \begin{frame}{Why optimize recursive SQL?}
+% \vspace{0.6em}
+% {\small\color{UHblack!75}A recursive step repeats. Work independent of the recursion need not.\par}
+% \vspace{0.8em}
+% {\small\textbf{Example:} Find routes using only approved airlines.\par}
+% \vspace{0.7em}
+% \begin{columns}[T,onlytextwidth]
+%   \begin{column}{0.485\textwidth}
+%     \motivationcard{Repeated work}
+%       {At each iteration:\par
+%        build eligible flights;\par
+%        extend the current routes.}{UHblack!3}
+%   \end{column}
+%   \begin{column}{0.485\textwidth}
+%     \motivationcard{Loop hoisting}
+%       {Once: build eligible flights.\par
+%        Each iteration: extend routes\par
+%        using the prepared relation.}{UHred!6}
+%   \end{column}
+% \end{columns}
+% \vspace{0.5em}
+% \motivationcard{When is loop hoisting correct and beneficial?}
+%   {Identify invariant work, preserve SQL semantics, and measure the performance impact.}{UHblack!3}
+% % Illustrative execution strategies, not a claim about every SQL optimizer.
+% % Recursive evaluation reference: PostgreSQL documentation, section 7.8.2.
+% % https://www.postgresql.org/docs/current/queries-with.html
+% \end{frame}
 
 \begin{frame}{Recursion in SQL}
 \vspace{0.8em}
@@ -129,22 +145,47 @@
 \motivationcard{Recursive queries through recursive Common Table Expressions (CTEs)}
   {Part of the SQL standard since \textbf{SQL:1999}.\par}{UHblack!3}
 \vspace{0.5em}
-\centering
+\begin{columns}[T,onlytextwidth]
+\begin{column}{0.52\textwidth}
 \motivationcard{Transitive closure}
-  {{\ttfamily\small
+  {{\ttfamily\footnotesize
   \begin{tabular}{@{}l@{}}
-  \lstinline[style=slidesql]|WITH RECURSIVE tc(src, dst) AS (|\\
-  \quad \lstinline[style=slidesql]|-- Anchor: direct edges|\\
-  \quad \lstinline[style=slidesql]|SELECT src, dst FROM edge|\\
-  \quad \lstinline[style=slidesql]|UNION|\\
-  \quad \lstinline[style=slidesql]|-- Recursion: extend by one edge|\\
-  \quad \lstinline[style=slidesql]|SELECT tc.src, e.dst|\\
-  \quad \lstinline[style=slidesql]|FROM tc JOIN edge e ON tc.dst = e.src|\\
-  \lstinline[style=slidesql]|)|\\
-  \lstinline[style=slidesql]|SELECT src, dst FROM tc;|
+  \lstinline[style=slidesqlcompact]|WITH RECURSIVE tc(src, dst) AS (|\\
+  \quad \lstinline[style=slidesqlcompact]|-- Anchor:| {\color{UHblack!55}\itshape q\textsubscript{a}}\\
+  \quad \lstinline[style=slidesqlcompact]|SELECT src, dst FROM edge|\\
+  \quad \lstinline[style=slidesqlcompact]|UNION|\\
+  \quad \lstinline[style=slidesqlcompact]|-- Recursive term:| {\color{UHblack!55}\itshape q\textsubscript{r}}\\
+  \quad \lstinline[style=slidesqlcompact]|SELECT tc.src, e.dst|\\
+  \quad \lstinline[style=slidesqlcompact]|FROM tc JOIN edge e|\\
+  \qquad \lstinline[style=slidesqlcompact]|ON tc.dst = e.src|\\
+  \lstinline[style=slidesqlcompact]|)|\\
+  \lstinline[style=slidesqlcompact]|SELECT src, dst FROM tc;|
   \end{tabular}}\par
   \vspace{4pt}
   {}}{UHred!6}
+\end{column}
+\begin{column}{0.46\textwidth}
+\motivationcard{Semi-naive Evaluation}
+  {{\footnotesize
+  \begin{tabular}{@{}l@{}}
+  $\delta TC \leftarrow \operatorname{deduplicate}(q_a(\texttt{edge}))$\\
+  $RT \leftarrow \delta TC$\\[4pt]
+  \textbf{while} $\delta TC \ne \varnothing$\\
+  \quad $IT \leftarrow \operatorname{deduplicate}(q_r(\texttt{edge}, \delta TC)) - RT$\\
+  \quad $RT \leftarrow RT \cup IT$\\
+  \quad $\delta TC \leftarrow IT$\\
+  \textbf{end}\\[4pt]
+  \textbf{return} $RT$
+  \end{tabular}\par
+  \vspace{5pt}
+  \begin{tabular}{@{}l@{\quad}l@{}}
+  $\delta TC$: & working table\\
+  $IT$: & intermediate table\\
+  $RT$: & result table
+  \end{tabular}
+  }}{UHblack!3}
+\end{column}
+\end{columns}
 
 % \begin{tikzpicture}[
 %   stage/.style={draw=UHblack!9,fill=UHblack!3,rounded corners=4pt,
@@ -174,7 +215,83 @@
 % \href{https://zedware.github.io/homepage/db/sql99-known-as-sql3.pdf}{SQL:1999, formerly known as SQL3}.\par}
 \end{frame}
 
-\section{Section 1: text}
+\begin{frame}{Adding loop hoisting optimizations}
+\renewcommand{\motivationpadding}{5pt}
+\renewcommand{\motivationgap}{5pt}
+\renewcommand{\motivationtitlefont}{\normalsize\bfseries}
+\begin{columns}[c,onlytextwidth]
+\begin{column}{0.48\textwidth}
+\motivationcard{Semi-naive Evaluation}
+  {{\footnotesize
+  \begin{tabular}{@{}l@{}}
+  $\delta TC \leftarrow \operatorname{deduplicate}(q_a(\texttt{edge}))$\\
+  $RT \leftarrow \delta TC$\\[4pt]
+  \textbf{while} $\delta TC \ne \varnothing$\\
+  \quad \tikz[remember picture,baseline=(itstep.base)]{
+    \node[fill=UHred!10,rounded corners=2pt,
+      inner xsep=3pt,inner ysep=2pt,outer sep=0pt] (itstep)
+      {$IT \leftarrow \operatorname{deduplicate}(q_r(\texttt{edge}, \delta TC)) - RT$};}\\
+  \quad $RT \leftarrow RT \cup IT$\\
+  \quad $\delta TC \leftarrow IT$\\
+  \textbf{end}\\[4pt]
+  \textbf{return} $RT$
+  \end{tabular}\par
+  \vspace{5pt}
+  \begin{tabular}{@{}l@{\quad}l@{}}
+  $\delta TC$: & working table\\
+  $IT$: & intermediate table\\
+  $RT$: & result table
+  \end{tabular}
+  }}{UHblack!3}
+\end{column}
+\begin{column}{0.44\textwidth}
+\begin{tikzpicture}[remember picture]
+  \node[fill=UHred!6,draw=UHblack!9,rounded corners=4pt,
+    text width=\dimexpr\linewidth-0.8cm-1pt\relax,
+    inner xsep=0.4cm,inner ysep=8pt,outer sep=0pt,
+    align=left] (joinplanbox) {%
+    {\color{UHblack}\normalsize\bfseries Join plan\par}
+    \vspace{5pt}
+    \centering
+    \begin{tikzpicture}[remember picture,text=UHblack,
+      every node/.style={font=\footnotesize,inner sep=3pt},
+      every path/.style={draw=UHblack!75,line width=0.8pt}]
+      \node[font=\Large] (anti) at (2.2,0) {$\triangleleft$};
+      \node[align=center] (dedup) at (1.1,-0.9) {deduplicate\\(aggregate)};
+      \node (rt) at (3.8,-0.9) {$RT$};
+      \node[font=\Large] (join) at (1.1,-1.75) {$\bowtie$};
+      \node (edge) at (0.2,-2.65) {\texttt{edge}};
+      \node (wt) at (2.0,-2.65) {$\delta TC$};
+      \path (anti) -- (dedup);
+      \path (anti) -- (rt);
+      \path (dedup) -- (join);
+      \path (join) -- (wt);
+      \path (join) -- (edge);
+      \node[font=\scriptsize,text=UHblack!65,anchor=west]
+        at (2.55,0) {left anti join};
+    \end{tikzpicture}\par
+  };
+\end{tikzpicture}
+\par\vspace{0.3cm}
+\begin{tikzpicture}[remember picture]
+  \node[fill=UHred!6,draw=UHred!40,rounded corners=4pt,
+    text width=\dimexpr\linewidth-0.8cm-1pt\relax,
+    inner xsep=0.4cm,inner ysep=7pt,outer sep=0pt,
+    align=left,font=\footnotesize,text=UHblack] (hashreuse) {%
+    Hash join builds hash table on \texttt{edge}, reuse this accross iterations
+  };
+\end{tikzpicture}
+\end{column}
+\end{columns}
+\begin{tikzpicture}[remember picture,overlay]
+  \draw[-latex,UHred,line width=1.5pt,shorten >=2pt]
+    ([xshift=3pt]itstep.east) -- (joinplanbox.west |- itstep.east);
+  \draw[-latex,UHred,line width=1.2pt,shorten <=2pt,shorten >=2pt]
+    (edge.south) -- (hashreuse.north -| edge.south);
+\end{tikzpicture}
+\end{frame}
+
+\section{TODO: rest van de presentatie}
 \begin{frame}
 \frametitle{My first frametitle}
 Welcome to this DSI Latex Beamer template!
