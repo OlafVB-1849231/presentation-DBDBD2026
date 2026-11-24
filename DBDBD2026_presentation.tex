@@ -145,39 +145,49 @@
 % \end{frame}
 
 \begin{frame}{Recursion in SQL}
+\definecolor{anchorquery}{HTML}{0072B2}
+\definecolor{recursivequery}{HTML}{B35C00}
+\lstdefinestyle{anchorquerysql}{style=slidesqlcompact,
+  basicstyle=\ttfamily\footnotesize\color{anchorquery},
+  keywordstyle=\color{anchorquery}\bfseries,
+  identifierstyle=\color{anchorquery}}
+\lstdefinestyle{recursivequerysql}{style=slidesqlcompact,
+  basicstyle=\ttfamily\footnotesize\color{recursivequery},
+  keywordstyle=\color{recursivequery}\bfseries,
+  identifierstyle=\color{recursivequery}}
 \vspace{0.2em}
 \renewcommand{\motivationpadding}{5pt}
 \renewcommand{\motivationgap}{5pt}
 \renewcommand{\motivationtitlefont}{\normalsize\bfseries}
-\begin{columns}[T,onlytextwidth]
-\begin{column}{0.52\textwidth}
 \motivationcard{Recursive CTEs}
   {{\ttfamily\footnotesize
   \begin{tabular}{@{}l@{}}
-  \lstinline[style=slidesqlcompact]|WITH RECURSIVE R(A,B,...) AS (|\\
-  \quad $Q_a$ \lstinline[style=slidesqlcompact]|UNION| $Q_r$\\
+  \lstinline[style=slidesqlcompact]|WITH RECURSIVE R(A,B,...) AS (|\quad
+  $\textcolor{anchorquery}{Q_a}$ \lstinline[style=slidesqlcompact]|UNION| $\textcolor{recursivequery}{Q_r}$\quad
   \lstinline[style=slidesqlcompact]|)|
   \end{tabular}}\par
   \vspace{4pt}
   \uncover<2->{%
   {\footnotesize
   \textbf{For transitive closure:}\par
-  \begin{tabular}{@{}l@{\ }l@{}}
-  $Q_a =$ & \lstinline[style=slidesqlcompact]|SELECT src, dst FROM edge|\quad $\sim \texttt{edge}$\\[3pt]
-  $Q_r =$ & \lstinline[style=slidesqlcompact]|SELECT tc.src, e.dst|\quad $\sim TC \bowtie \texttt{edge}$\\
-          & \lstinline[style=slidesqlcompact]|FROM tc JOIN edge e|\\
-          & \lstinline[style=slidesqlcompact]|ON tc.dst = e.src|
+  \begin{tabular}{@{}l@{\ }l@{\quad}l@{\quad}l@{}}
+  $\textcolor{anchorquery}{Q_a} =$ & \lstinline[style=anchorquerysql]|SELECT src, dst FROM edge| & $\textcolor{anchorquery}{TC(a,b) \mathrel{\texttt{:-}} \texttt{edge}(a,b).}$ & $\sim \textcolor{anchorquery}{\texttt{edge}}$\\[3pt]
+  $\textcolor{recursivequery}{Q_r} =$ & \lstinline[style=recursivequerysql]|SELECT tc.src, e.dst| & $\textcolor{recursivequery}{TC(a,b) \mathrel{\texttt{:-}} \texttt{edge}(a,c),\ TC(c,b).}$ & $\sim \textcolor{recursivequery}{TC \bowtie \texttt{edge}}$\\
+          & \lstinline[style=recursivequerysql]|FROM tc JOIN edge e| & & \\
+          & \lstinline[style=recursivequerysql]|ON tc.dst = e.src| & &
   \end{tabular}\par
   }}}{UHred!6}
+\begin{columns}[T,onlytextwidth]
+\begin{column}{0.52\textwidth}
 \uncover<3->{%
 \motivationcard{Semantics (naive evaluation)}
   {{\footnotesize
   \begin{tabular}{@{}l@{}}
   $WT \leftarrow \varnothing$\\
-  $TC \leftarrow \texttt{edge}$\\[4pt]
+  $TC \leftarrow \textcolor{anchorquery}{\texttt{edge}}$\\[4pt]
   \textbf{while} $|TC| > |WT|$ \textbf{do}\\
   \quad $WT \leftarrow TC$\\
-  \quad $TC \leftarrow \texttt{edge} \cup (\texttt{edge} \bowtie TC$)\\
+  \quad $TC \leftarrow \textcolor{anchorquery}{\texttt{edge}} \cup (\textcolor{recursivequery}{\texttt{edge} \bowtie TC})$\\
   \textbf{end}
   \end{tabular}
   }}{UHblack!3}
@@ -188,16 +198,13 @@
 \motivationcard{Semi-naive evaluation}
   {{\footnotesize
   \begin{tabular}{@{}l@{}}
-  $\delta TC \leftarrow \operatorname{deduplicate}(\texttt{edge})$\\
+  $\delta TC \leftarrow \operatorname{deduplicate}(\textcolor{anchorquery}{\texttt{edge}})$\\
   $TC \leftarrow \delta TC$\\[4pt]
   \textbf{while} $\delta TC \ne \varnothing$\\
-  \quad $\delta TC \leftarrow \operatorname{deduplicate}(\texttt{edge} \bowtie \delta TC) - TC$\\
+  \quad $\delta TC \leftarrow \operatorname{deduplicate}(\textcolor{recursivequery}{\texttt{edge} \bowtie \delta TC}) - TC$\\
   \quad $TC \leftarrow TC \cup \delta TC$\\
-  \textbf{end}\\[4pt]
+  \textbf{end}
   \end{tabular}\par
-  \vspace{5pt}
-  \begin{tabular}{@{}l@{\quad}l@{}}
-  \end{tabular}
   }}{UHblack!3}
 }
 \end{column}
@@ -232,7 +239,6 @@
 \end{frame}
 
 \begin{frame}{Adding loop hoisting optimizations}
-\optimizationlabel{1}{4}
 \tikzset{delta highlight/.style={fill=UHblack!3}}
 \only<2->{\tikzset{delta highlight/.style={fill=UHred!10}}}
 \renewcommand{\motivationpadding}{5pt}
@@ -260,7 +266,7 @@
 \begin{tikzpicture}[remember picture]
   \node[fill=UHred!6,draw=UHblack!9,rounded corners=4pt,
     text width=\dimexpr\linewidth-0.8cm-1pt\relax,
-    inner xsep=0.4cm,inner ysep=8pt,outer sep=0pt,
+    inner xsep=0.4cm,inner ysep=6pt,outer sep=0pt,
     align=left] (joinplanbox) {%
     {\color{UHblack}\normalsize\bfseries Join plan\par}
     \vspace{5pt}
@@ -270,8 +276,8 @@
       every path/.style={draw=UHblack!75,line width=0.8pt}]
       \node[font=\Large] (anti) at (2.2,0) {$\triangleleft$};
       \node[align=center] (dedup) at (1.1,-0.9) {%
-        \alt<3->{\underline{deduplicate}}{deduplicate\vphantom{\underline{deduplicate}}}\\
-        \alt<3->{\underline{(aggregate)}}{(aggregate)\vphantom{\underline{(aggregate)}}}};
+        deduplicate\vphantom{\underline{deduplicate}}\\
+        (aggregate)\vphantom{\underline{(aggregate)}}};
       \node (tc) at (3.8,-0.9) {$TC$};
       \node[font=\Large] (join) at (1.1,-1.75) {$\bowtie$};
       \node (edge) at (0.2,-2.65) {%
@@ -291,13 +297,15 @@
     {\underline{build hash table}};}
 \end{tikzpicture}
 }
-\par\vspace{0.3cm}
+\par\vspace{0.1cm}
 \uncover<4->{%
 \begin{tikzpicture}[remember picture]
   \node[fill=UHred!6,draw=UHred!40,rounded corners=4pt,
     text width=\dimexpr\linewidth-0.8cm-1pt\relax,
     inner xsep=0.4cm,inner ysep=7pt,outer sep=0pt,
     align=left,font=\footnotesize,text=UHblack] (hashreuse) {%
+    {\color{UHred}\normalsize\bfseries Optimization~\overviewnumber{1}\par}
+    \vspace{4pt}
     Hash join builds hash table on \texttt{edge}, reuse this accross iterations
   };
 \end{tikzpicture}
@@ -348,7 +356,7 @@
     \only<3->{%
       \node[align=center,fill=UHred!12,draw=UHred,
         rounded corners=3pt,inner sep=6pt] (combinedoperator) at (2.2,-0.15)
-        {{\normalsize\bfseries AAJ}\\{\scriptsize AggregatAntiJoin}};
+        {{\normalsize\bfseries AAJ}\\{\scriptsize AggregateAntiJoin}};
       \draw[plan edge] (combinedoperator) -- (combinejoin);
       \draw[plan edge] (combinedoperator) -- (combinetc);
     }
@@ -425,23 +433,23 @@
   chunk/.style={draw=UHblack!35,fill=UHblack!3,rounded corners=3pt,
     minimum width=1.9cm,minimum height=1.15cm,font=\large},
   grouping/.style={draw=UHblack!65,line width=0.9pt}]
-  \node[chunk] (tcfirst) at (0,0) {$TC_{[0]}$};
-  \node[chunk] at (2.3,0) {$TC_{[1]}$};
-  \node[chunk] at (4.6,0) {$TC_{[2]}$};
+  \node[chunk] (tcfirst) at (0,0) {$\delta TC_{0}$};
+  \node[chunk] at (2.3,0) {$\delta TC_{1}$};
+  \node[chunk] at (4.6,0) {$\delta TC_{2}$};
   \node[font=\Large] at (6.9,0) {$\cdots$};
-  \node[chunk,draw=UHred,fill=UHred!10] (tclast) at (9.2,0) {$TC_{[i]}$};
+  \node[chunk,draw=UHred,fill=UHred!10] (tclast) at (9.2,0) {$\delta TC_{i}$};
 
   \draw[grouping] (-0.95,0.85) -- (-0.95,1.1) -- (10.15,1.1) -- (10.15,0.85);
   \node[anchor=south,font=\large] at (4.6,1.2)
-    {$TC = \displaystyle\bigcup_{k=0}^{i} TC_{[k]}$};
+    {$TC = \displaystyle\bigcup_{k=0}^{i} \delta TC_{k}$};
 
   \draw[UHred,line width=0.9pt] (8.25,-0.85) -- (8.25,-1.1)
     -- (10.15,-1.1) -- (10.15,-0.85);
   \node[anchor=north,font=\large,text=UHred] at (9.2,-1.2)
-    {$\delta TC = TC_{[i]}$};
+    {$\delta TC = \delta TC_{i}$};
 \end{tikzpicture}
 }
-\only<2>{%
+\only<3->{%
 \begin{tikzpicture}[text=UHblack,
   chunk/.style={draw=UHblack!35,fill=UHblack!3,rounded corners=3pt,
     minimum width=1.9cm,minimum height=1.15cm,font=\normalsize},
@@ -449,12 +457,12 @@
   \draw[UHblack!65,line width=0.9pt]
     (-0.95,3.1) -- (-0.95,3.35) -- (10.15,3.35) -- (10.15,3.1);
   \node[anchor=south,font=\large] at (4.6,3.45)
-    {$TC = \displaystyle\bigcup_{k=0}^{i} TC_{[k]}$};
-  \node[chunk] (partitioninputzero) at (0,2.25) {$TC_{[0]}$};
-  \node[chunk] (partitioninputone) at (2.3,2.25) {$TC_{[1]}$};
-  \node[chunk] (partitioninputtwo) at (4.6,2.25) {$TC_{[2]}$};
+    {$TC = \displaystyle\bigcup_{k=0}^{i} \delta TC_{k}$};
+  \node[chunk] (partitioninputzero) at (0,2.25) {$\delta TC_{0}$};
+  \node[chunk] (partitioninputone) at (2.3,2.25) {$\delta TC_{1}$};
+  \node[chunk] (partitioninputtwo) at (4.6,2.25) {$\delta TC_{2}$};
   \node[font=\Large] at (6.9,2.25) {$\cdots$};
-  \node[chunk] (partitioninputlast) at (9.2,2.25) {$TC_{[i]}$};
+  \node[chunk] (partitioninputlast) at (9.2,2.25) {$\delta TC_{i}$};
   \node[draw=UHred,fill=UHred!6,rounded corners=3pt,
     anchor=east,align=center,font=\small,inner sep=5pt] at (-0.8,0.65)
     {Hash Repartition\\operator};
@@ -477,7 +485,7 @@
   }
 \end{tikzpicture}
 }
-\only<3->{%
+\only<2>{%
 \begin{tikzpicture}[text=UHblack,x=0.95cm,y=0.8cm,
   chunk/.style={draw=UHblack!35,fill=UHblack!3,rounded corners=3pt,
     minimum width=1.9cm,minimum height=1.15cm,font=\normalsize},
@@ -500,16 +508,16 @@
   \draw[plan edge] (insertAAJ) -- (insertrepartition);
   \draw[plan edge] (insertrepartition) -- (insertTC);
 
-  \node[chunk] at (0,6.8) {$TC_{[0]}$};
-  \node[chunk] at (2.3,6.8) {$TC_{[1]}$};
-  \node[chunk] at (4.6,6.8) {$TC_{[2]}$};
+  \node[chunk] at (0,6.8) {$\delta TC_{0}$};
+  \node[chunk] at (2.3,6.8) {$\delta TC_{1}$};
+  \node[chunk] at (4.6,6.8) {$\delta TC_{2}$};
   \node[font=\Large] at (6.3,6.8) {$\cdots$};
-  \node[chunk] at (8,6.8) {$TC_{[i]}$};
+  \node[chunk] at (8,6.8) {$\delta TC_{i}$};
   \node[chunk,draw=UHred,fill=UHred!10] (tcnext) at (10.3,6.8) {};
   \draw[UHblack!65,line width=0.9pt]
     (-1,7.8) -- (-1,8.05) -- (9,8.05) -- (9,7.8);
   \node[anchor=south,font=\large] at (4,8.15)
-    {$TC = \displaystyle\bigcup_{k=0}^{i} TC_{[k]}$};
+    {$TC = \displaystyle\bigcup_{k=0}^{i} \delta TC_{k}$};
   \draw[-latex,UHred,line width=1.2pt,rounded corners=5pt]
     (insertAAJ.north) -- (1.65,5.35) -- (10.3,5.35) -- (tcnext.south);
   \node[font=\small,text=UHred,anchor=south] at (7,5.5) {Insert output};
@@ -537,7 +545,7 @@
       \node[draw=\partitioncolor!65!black,fill=white,
         rounded corners=2pt,minimum width=1.35cm,minimum height=0.4cm,
         inner sep=1pt,font=\footnotesize]
-        at (\chunkx,\partitiony) {$TC_{[\iteration]}$};
+        at (\chunkx,\partitiony) {$\delta TC_{\iteration}$};
     }
     \node[draw=\partitioncolor!65!black,fill=white,
       rounded corners=2pt,minimum width=1.35cm,minimum height=0.4cm,
@@ -548,7 +556,7 @@
   \draw[UHblack!65,line width=0.9pt]
     (-1.53,8.95) -- (-1.53,9.2) -- (9.63,9.2) -- (9.63,8.95);
   \node[font=\large,anchor=south] at (4.05,9.3)
-    {$TC = \displaystyle\bigcup_{k=0}^{i} TC_{[k]}$};
+    {$TC = \displaystyle\bigcup_{k=0}^{i} \delta TC_{k}$};
 
   \draw[fill=UHred!6,draw=UHblack!15,rounded corners=4pt]
     (-1.1,-0.9) rectangle (5,4.25);
