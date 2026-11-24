@@ -59,23 +59,30 @@
   \par\addvspace{\motivationgap}
 }
 
+% Show each optimization label on its introduction overlay only.
+\newcommand{\optimizationlabel}[2]{%
+  \only<#2>{%
+    \begin{tikzpicture}[remember picture,overlay]
+      \node[anchor=south west,font=\small\bfseries,text=UHred]
+        at ([xshift=0.6cm,yshift=0.45cm]current page.south west)
+        (optimizationtext) {Optimization};
+      \node[anchor=west,circle,fill=UHred,text=white,inner sep=1.5pt,
+        font=\small] at ([xshift=4pt]optimizationtext.east) {#1};
+    \end{tikzpicture}%
+  }%
+}
+
+\newcommand{\overviewnumber}[1]{%
+  \tikz[baseline=(number.base)]{%
+    \node[circle,fill=UHred,text=white,inner sep=1pt,
+      font=\footnotesize] (number) {#1};}}
+
 \begin{document}
 % --------------------------------------------------- Slide --
 \begin{frame}
   \titlepage
 \end{frame}
 
-\begin{frame}{Contents}
-  \begin{itemize}
-    \setlength{\itemsep}{0.7em}
-    \item Motivation
-    \item Recursion in SQL
-    \item Applying loop hoisting optimizations
-    \item Experiments
-    \item Analysis
-    \item Conclusion
-  \end{itemize}
-\end{frame}
 
 \begin{frame}{Motivation}
 \renewcommand{\motivationtitlefont}{\normalsize\bfseries}
@@ -225,6 +232,7 @@
 \end{frame}
 
 \begin{frame}{Adding loop hoisting optimizations}
+\optimizationlabel{1}{4}
 \tikzset{delta highlight/.style={fill=UHblack!3}}
 \only<2->{\tikzset{delta highlight/.style={fill=UHred!10}}}
 \renewcommand{\motivationpadding}{5pt}
@@ -278,6 +286,9 @@
         at (2.55,0) {left anti join};
     \end{tikzpicture}\par
   };
+  \only<3->{\node[overlay,anchor=south east,font=\scriptsize,text=UHblack,
+    inner sep=0pt] at ([xshift=-8pt,yshift=8pt]joinplanbox.south east)
+    {\underline{build hash table}};}
 \end{tikzpicture}
 }
 \par\vspace{0.3cm}
@@ -302,6 +313,7 @@
 \end{frame}
 
 \begin{frame}{Combining deduplication and anti join}
+\optimizationlabel{2}{3}
 \renewcommand{\motivationpadding}{7pt}
 \renewcommand{\motivationtitlefont}{\normalsize\bfseries}
 \begin{columns}[c,onlytextwidth]
@@ -365,6 +377,316 @@
 \end{column}
 \end{columns}
 \end{frame}
+
+\begin{frame}{incremental hash partitioned storage}
+\renewcommand{\motivationpadding}{7pt}
+\renewcommand{\motivationtitlefont}{\normalsize\bfseries}
+\begin{columns}[c,onlytextwidth]
+\begin{column}{0.49\textwidth}
+\motivationcard{Join plan}
+  {\centering
+  \begin{tikzpicture}[text=UHblack,
+    every node/.style={font=\footnotesize,inner sep=3pt},
+    plan edge/.style={draw=UHblack!75,line width=0.8pt}]
+    \path[use as bounding box] (-0.25,0.4) rectangle (5,-3.1);
+    \node[font=\Large] (storagejoin) at (1.1,-1.75) {$\bowtie$};
+    \node (storageedge) at (0.2,-2.65) {\texttt{edge}};
+    \node (storagedelta) at (2.0,-2.65) {$\delta TC$};
+    \alt<2->{\node (storagetc) at (3.8,-1.85) {$TC$};}
+      {\node (storagetc) at (3.8,-0.9) {$TC$};}
+    \node[font=\normalsize] (storageoperator) at (2.2,-0.15) {AAJ};
+    \draw[plan edge] (storagejoin) -- (storageedge);
+    \draw[plan edge] (storagejoin) -- (storagedelta);
+    \draw[plan edge] (storageoperator) -- (storagejoin);
+    \only<1>{\draw[plan edge] (storageoperator) -- (storagetc);}
+    \only<2->{%
+      \node[align=center,fill=UHred!12,draw=UHred,
+        rounded corners=3pt,inner sep=5pt] (storagerepartition) at (3.8,-0.9)
+        {Hash\\Repartition};
+      \draw[plan edge] (storageoperator) -- (storagerepartition);
+      \draw[plan edge] (storagerepartition) -- (storagetc);
+    }
+  \end{tikzpicture}\par
+  }{UHred!6}
+\end{column}
+\begin{column}{0.46\textwidth}
+\uncover<2->{%
+\motivationcard{In multithreaded scenario:}
+  {inputs needs to be hash partitioned}{UHred!6}
+}
+\end{column}
+\end{columns}
+\end{frame}
+
+\begin{frame}{TC in memory}
+\centering
+\only<1>{%
+\begin{tikzpicture}[text=UHblack,
+  chunk/.style={draw=UHblack!35,fill=UHblack!3,rounded corners=3pt,
+    minimum width=1.9cm,minimum height=1.15cm,font=\large},
+  grouping/.style={draw=UHblack!65,line width=0.9pt}]
+  \node[chunk] (tcfirst) at (0,0) {$TC_{[0]}$};
+  \node[chunk] at (2.3,0) {$TC_{[1]}$};
+  \node[chunk] at (4.6,0) {$TC_{[2]}$};
+  \node[font=\Large] at (6.9,0) {$\cdots$};
+  \node[chunk,draw=UHred,fill=UHred!10] (tclast) at (9.2,0) {$TC_{[i]}$};
+
+  \draw[grouping] (-0.95,0.85) -- (-0.95,1.1) -- (10.15,1.1) -- (10.15,0.85);
+  \node[anchor=south,font=\large] at (4.6,1.2)
+    {$TC = \displaystyle\bigcup_{k=0}^{i} TC_{[k]}$};
+
+  \draw[UHred,line width=0.9pt] (8.25,-0.85) -- (8.25,-1.1)
+    -- (10.15,-1.1) -- (10.15,-0.85);
+  \node[anchor=north,font=\large,text=UHred] at (9.2,-1.2)
+    {$\delta TC = TC_{[i]}$};
+\end{tikzpicture}
+}
+\only<2>{%
+\begin{tikzpicture}[text=UHblack,
+  chunk/.style={draw=UHblack!35,fill=UHblack!3,rounded corners=3pt,
+    minimum width=1.9cm,minimum height=1.15cm,font=\normalsize},
+  flow/.style={-latex,draw=UHblack!65,line width=1pt}]
+  \draw[UHblack!65,line width=0.9pt]
+    (-0.95,3.1) -- (-0.95,3.35) -- (10.15,3.35) -- (10.15,3.1);
+  \node[anchor=south,font=\large] at (4.6,3.45)
+    {$TC = \displaystyle\bigcup_{k=0}^{i} TC_{[k]}$};
+  \node[chunk] (partitioninputzero) at (0,2.25) {$TC_{[0]}$};
+  \node[chunk] (partitioninputone) at (2.3,2.25) {$TC_{[1]}$};
+  \node[chunk] (partitioninputtwo) at (4.6,2.25) {$TC_{[2]}$};
+  \node[font=\Large] at (6.9,2.25) {$\cdots$};
+  \node[chunk] (partitioninputlast) at (9.2,2.25) {$TC_{[i]}$};
+  \node[draw=UHred,fill=UHred!6,rounded corners=3pt,
+    anchor=east,align=center,font=\small,inner sep=5pt] at (-0.8,0.65)
+    {Hash Repartition\\operator};
+
+  % Each color identifies one output partition.
+  \foreach \partitionindex/\partitionx/\partitioncolor/\sourceoffset in
+    {0/0.6/blue/-12pt,1/4.6/teal/0pt,2/8.6/orange/12pt} {
+    \node[draw=\partitioncolor!75!black,fill=\partitioncolor!9,
+      rounded corners=4pt,minimum width=2.65cm,minimum height=1.5cm,
+      font=\small,text=\partitioncolor!65!black]
+      (outputpartition\partitionindex) at (\partitionx,-1.15)
+      {partition \partitionindex};
+    \foreach \sourcechunk/\targetoffset in
+      {partitioninputzero/-27pt,partitioninputone/-9pt,partitioninputtwo/9pt,partitioninputlast/27pt} {
+      \draw[-latex,draw=\partitioncolor!75!black,line width=1pt]
+        ([xshift=\sourceoffset]\sourcechunk.south)
+        --
+        ([xshift=\targetoffset]outputpartition\partitionindex.north);
+    }
+  }
+\end{tikzpicture}
+}
+\only<3->{%
+\begin{tikzpicture}[text=UHblack,x=0.95cm,y=0.8cm,
+  chunk/.style={draw=UHblack!35,fill=UHblack!3,rounded corners=3pt,
+    minimum width=1.9cm,minimum height=1.15cm,font=\normalsize},
+  plan edge/.style={draw=UHblack!75,line width=0.8pt}]
+  % The join plan produces the next iteration's chunk.
+  \draw[fill=UHred!6,draw=UHblack!15,rounded corners=4pt]
+    (-0.95,1.25) rectangle (4.65,4.95);
+  \node[anchor=west,font=\normalsize\bfseries] at (-0.55,4.5) {Join plan};
+  \node[font=\normalsize] (insertAAJ) at (1.65,3.85) {AAJ};
+  \node[font=\Large] (insertjoin) at (0.6,2.75) {$\bowtie$};
+  \node[font=\footnotesize] (insertedge) at (-0.2,1.8) {\texttt{edge}};
+  \node[font=\footnotesize] (insertdelta) at (1.5,1.8) {$\delta TC$};
+  \node[align=center,font=\scriptsize,draw=UHred,fill=UHred!12,
+    rounded corners=3pt,inner sep=4pt] (insertrepartition) at (3.35,3.1)
+    {Hash\\Repartition};
+  \node[font=\footnotesize] (insertTC) at (3.35,1.8) {$TC$};
+  \draw[plan edge] (insertAAJ) -- (insertjoin);
+  \draw[plan edge] (insertjoin) -- (insertedge);
+  \draw[plan edge] (insertjoin) -- (insertdelta);
+  \draw[plan edge] (insertAAJ) -- (insertrepartition);
+  \draw[plan edge] (insertrepartition) -- (insertTC);
+
+  \node[chunk] at (0,6.8) {$TC_{[0]}$};
+  \node[chunk] at (2.3,6.8) {$TC_{[1]}$};
+  \node[chunk] at (4.6,6.8) {$TC_{[2]}$};
+  \node[font=\Large] at (6.3,6.8) {$\cdots$};
+  \node[chunk] at (8,6.8) {$TC_{[i]}$};
+  \node[chunk,draw=UHred,fill=UHred!10] (tcnext) at (10.3,6.8) {};
+  \draw[UHblack!65,line width=0.9pt]
+    (-1,7.8) -- (-1,8.05) -- (9,8.05) -- (9,7.8);
+  \node[anchor=south,font=\large] at (4,8.15)
+    {$TC = \displaystyle\bigcup_{k=0}^{i} TC_{[k]}$};
+  \draw[-latex,UHred,line width=1.2pt,rounded corners=5pt]
+    (insertAAJ.north) -- (1.65,5.35) -- (10.3,5.35) -- (tcnext.south);
+  \node[font=\small,text=UHred,anchor=south] at (7,5.5) {Insert output};
+
+\end{tikzpicture}
+}
+\end{frame}
+
+\begin{frame}{incremental hash partitioned storage}
+\optimizationlabel{3}{1}
+\centering
+\hspace*{1cm}% Leave the footer label clear of the join-plan box.
+\resizebox{!}{0.88\textheight}{%
+\begin{tikzpicture}[text=UHblack,x=0.95cm,y=0.65cm,
+  plan edge/.style={draw=UHblack!75,line width=0.8pt}]
+  % Each partition keeps the chunks from all iterations.
+  \foreach \partitionindex/\partitiony/\partitioncolor in
+    {0/8.1/blue,1/6.7/teal,2/5.3/orange} {
+    \node[draw=\partitioncolor!75!black,fill=\partitioncolor!9,
+      rounded corners=4pt,minimum width=10.6cm,minimum height=0.72cm]
+      (storedpartition\partitionindex) at (4.05,\partitiony) {};
+    \node[anchor=west,font=\small,text=\partitioncolor!65!black]
+      at (-1.25,\partitiony) {partition \partitionindex};
+    \foreach \iteration/\chunkx in {0/1.35,1/3,2/4.65,i/7.1} {
+      \node[draw=\partitioncolor!65!black,fill=white,
+        rounded corners=2pt,minimum width=1.35cm,minimum height=0.4cm,
+        inner sep=1pt,font=\footnotesize]
+        at (\chunkx,\partitiony) {$TC_{[\iteration]}$};
+    }
+    \node[draw=\partitioncolor!65!black,fill=white,
+      rounded corners=2pt,minimum width=1.35cm,minimum height=0.4cm,
+      inner sep=1pt] (partitionnext\partitionindex) at (8.75,\partitiony) {};
+    \node[font=\normalsize,text=\partitioncolor!65!black]
+      at (5.95,\partitiony) {$\cdots$};
+  }
+  \draw[UHblack!65,line width=0.9pt]
+    (-1.53,8.95) -- (-1.53,9.2) -- (9.63,9.2) -- (9.63,8.95);
+  \node[font=\large,anchor=south] at (4.05,9.3)
+    {$TC = \displaystyle\bigcup_{k=0}^{i} TC_{[k]}$};
+
+  \draw[fill=UHred!6,draw=UHblack!15,rounded corners=4pt]
+    (-1.1,-0.9) rectangle (5,4.25);
+  \node[anchor=west,font=\normalsize\bfseries] at (-0.7,3.8) {Join plan};
+  \node[align=center,font=\scriptsize,draw=UHred,fill=UHred!12,
+    rounded corners=3pt,inner sep=4pt] (hoistedrepartition) at (2.2,2.95)
+    {Hash Repartition};
+  \node[font=\normalsize] (partitionedAAJ) at (2.2,1.7) {AAJ};
+  \node[font=\Large] (partitionedjoin) at (1,0.65) {$\bowtie$};
+  \node[font=\footnotesize] (partitionededge) at (0,-0.35) {\texttt{edge}};
+  \node[font=\footnotesize] (partitioneddelta) at (2,-0.35) {$\delta TC$};
+  \node[font=\footnotesize] (partitionedTC) at (4,0.65) {$TC$};
+  \draw[plan edge] (hoistedrepartition) -- (partitionedAAJ);
+  \draw[plan edge] (partitionedAAJ) -- (partitionedjoin);
+  \draw[plan edge] (partitionedAAJ) -- (partitionedTC);
+  \draw[plan edge] (partitionedjoin) -- (partitionededge);
+  \draw[plan edge] (partitionedjoin) -- (partitioneddelta);
+  \foreach \partitionindex/\partitioncolor in {0/blue,1/teal,2/orange} {
+    \draw[-latex,draw=\partitioncolor!75!black,line width=1pt]
+      (hoistedrepartition.east)
+      -- ({5.6+0.3*\partitionindex},{3.8-0.3*\partitionindex})
+      -- ({10.1+0.3*\partitionindex},{3.8-0.3*\partitionindex})
+      |- (partitionnext\partitionindex.east);
+  }
+\end{tikzpicture}%
+}
+\end{frame}
+
+\begin{frame}{Join plan}
+\optimizationlabel{4}{2}
+\begin{columns}[c,onlytextwidth]
+\begin{column}{0.44\textwidth}
+\begin{tikzpicture}[remember picture]
+  \node[fill=UHred!6,draw=UHblack!9,rounded corners=4pt,
+    text width=\dimexpr\linewidth-0.8cm-1pt\relax,
+    inner xsep=0.4cm,inner ysep=8pt,outer sep=0pt,
+    align=left] (newplanbox) {%
+    {\color{UHblack}\normalsize\bfseries Join plan\par}
+    \vspace{5pt}
+    \centering
+    \begin{tikzpicture}[remember picture,text=UHblack,
+      every node/.style={font=\footnotesize,inner sep=3pt},
+      every path/.style={draw=UHblack!75,line width=0.8pt}]
+      \tikzset{anti highlight/.style={}}
+      \only<2->{\tikzset{anti highlight/.style={draw=UHred,fill=UHred!12,
+        rounded corners=3pt}}}
+      \node[font=\Large,anti highlight] (newanti) at (2.2,0)
+        {\alt<2->{$\triangleright$}{$\triangleleft$}};
+      \node[align=center] (newdedup) at (1.1,-0.9)
+        {deduplicate\vphantom{\underline{deduplicate}}\\
+        (aggregate)\vphantom{\underline{(aggregate)}}};
+      \node (newtc) at (3.8,-0.9)
+        {\alt<2->{$\underline{TC}$}{$TC\vphantom{\underline{TC}}$}};
+      \node[font=\Large] (newjoin) at (1.1,-1.75) {$\bowtie$};
+      \node (newedge) at (0.2,-2.65)
+        {\alt<2->{\underline{\texttt{edge}}}{\texttt{edge}\vphantom{\underline{\texttt{edge}}}}};
+      \node (newdelta) at (2.0,-2.65) {$\delta TC$};
+      \path (newanti) -- (newdedup);
+      \path (newanti) -- (newtc);
+      \path (newdedup) -- (newjoin);
+      \path (newjoin) -- (newdelta);
+      \path (newjoin) -- (newedge);
+      \node[font=\scriptsize,text=UHblack!65,anchor=west]
+        at (2.65,0) {\alt<2->{right anti join}{left anti join}};
+    \end{tikzpicture}\par
+  };
+  \only<2->{\node[overlay,anchor=south east,font=\scriptsize,text=UHblack,
+    inner sep=0pt] at ([xshift=-8pt,yshift=8pt]newplanbox.south east)
+    {\underline{build hash table}};}
+\end{tikzpicture}
+\end{column}
+\begin{column}{0.51\textwidth}
+\uncover<2->{%
+\begin{tikzpicture}[remember picture]
+  \node[fill=UHred!6,draw=UHred!40,rounded corners=4pt,
+    text width=\dimexpr\linewidth-0.8cm-1pt\relax,
+    inner xsep=0.4cm,inner ysep=10pt,outer sep=0pt,
+    align=left,font=\small,text=UHblack] (hashstore) {%
+    store TC relation as a hash table (and add new output incrementally)
+  };
+\end{tikzpicture}
+}
+\end{column}
+\end{columns}
+\begin{tikzpicture}[remember picture,overlay]
+  \only<2->{\draw[-latex,UHred,line width=1.2pt,shorten <=2pt,shorten >=2pt]
+    (newtc.east) -- (hashstore.west |- newtc.east);}
+  \only<2->{\node[anchor=north west,align=left,text=UHred,font=\small,
+    text width=0.48\textwidth,inner sep=0pt]
+    at ([yshift=-10pt]hashstore.south west)
+    {\textbf{TODO:} make sure this matches exact working, explain
+     (how do we access delta TC: multiple hash tables).};}
+\end{tikzpicture}
+\end{frame}
+
+\begin{frame}{optimizations overview}
+{\normalsize\bfseries Implementation names\par}
+\vspace{0.2cm}
+{\small
+\renewcommand{\arraystretch}{1.65}
+\begin{tabular}{@{}c@{\hspace{10pt}}l@{\hspace{18pt}}l@{}}
+ & \texttt{Base} & No optimizations\\
+\overviewnumber{1} & \texttt{Edge} & edge reuse\\
+\overviewnumber{2} & \texttt{AAJ} & AggregateAntiJoin\\
+\overviewnumber{3} & \texttt{PartTC} & Hash partitioned TC storage\\
+\overviewnumber{4} & \texttt{HashTC} & TC saved as hash table
+\end{tabular}\par
+}
+
+\vspace{0.4cm}
+\renewcommand{\motivationtitlefont}{\normalsize\bfseries}
+\renewcommand{\motivationbodyfont}{\small}
+\renewcommand{\motivationpadding}{7pt}
+\motivationcard{TC storage applicability depends on anti join}
+  {Hash Partitioned TC storage (3) and TC saved as hash table (4)
+   \textbf{cannot be combined}. But depend on the anti join operator.}{UHred!6}
+\end{frame}
+
+\begin{frame}{experiments}
+\noindent\textbf{Tested configurations}\par
+\vspace{0.2cm}
+\begin{itemize}
+  \setlength{\itemsep}{0.65em}
+  \item \texttt{Base}
+  \item \texttt{Base+Edge}
+  \item \texttt{Base+Edge+AAJ}
+  \item \texttt{Base+Edge+AAJ+PartTC}
+  \item \texttt{Base+Edge+HashTC}
+\end{itemize}
+\vspace{0.35cm}
+\renewcommand{\motivationtitlefont}{\normalsize\bfseries}
+\renewcommand{\motivationbodyfont}{\small}
+\renewcommand{\motivationpadding}{7pt}
+\motivationcard{Datasets}
+  {A variety of different graphs from real world as well as randomly generated using specific structures (loop, tree, grid, ...)}{UHred!6}
+\end{frame}
+
+
 
 \section{TODO: rest van de presentatie}
 \begin{frame}
