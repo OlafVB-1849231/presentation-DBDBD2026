@@ -172,7 +172,7 @@
   \textbf{For transitive closure:}\par
   \begin{tabular}{@{}l@{\ }l@{\quad}l@{\quad}l@{}}
   $\textcolor{anchorquery}{Q_a} =$ & \lstinline[style=anchorquerysql]|SELECT src, dst FROM edge| & $\textcolor{anchorquery}{TC(a,b) \mathrel{\texttt{:-}} \texttt{edge}(a,b).}$ & $\sim \textcolor{anchorquery}{\texttt{edge}}$\\[3pt]
-  $\textcolor{recursivequery}{Q_r} =$ & \lstinline[style=recursivequerysql]|SELECT tc.src, e.dst| & $\textcolor{recursivequery}{TC(a,b) \mathrel{\texttt{:-}} \texttt{edge}(a,c),\ TC(c,b).}$ & $\sim \textcolor{recursivequery}{TC \bowtie \texttt{edge}}$\\
+  $\textcolor{recursivequery}{Q_r} =$ & \lstinline[style=recursivequerysql]|SELECT tc.src, e.dst| & $\textcolor{recursivequery}{TC(a,b) \mathrel{\texttt{:-}} \texttt{edge}(a,c),\ TC(c,b).}$ & $\sim \textcolor{recursivequery}{\pi_{a,b}(TC \bowtie \texttt{edge})}$\\
           & \lstinline[style=recursivequerysql]|FROM tc JOIN edge e| & & \\
           & \lstinline[style=recursivequerysql]|ON tc.dst = e.src| & &
   \end{tabular}\par
@@ -187,7 +187,7 @@
   $TC \leftarrow \textcolor{anchorquery}{\texttt{edge}}$\\[4pt]
   \textbf{while} $|TC| > |WT|$ \textbf{do}\\
   \quad $WT \leftarrow TC$\\
-  \quad $TC \leftarrow \textcolor{anchorquery}{\texttt{edge}} \cup (\textcolor{recursivequery}{\texttt{edge} \bowtie TC})$\\
+  \quad $TC \leftarrow \textcolor{anchorquery}{\texttt{edge}} \cup \textcolor{recursivequery}{\pi_{a,b}(\texttt{edge} \bowtie TC)}$\\
   \textbf{end}
   \end{tabular}
   }}{UHblack!3}
@@ -201,7 +201,7 @@
   $\delta TC \leftarrow \operatorname{deduplicate}(\textcolor{anchorquery}{\texttt{edge}})$\\
   $TC \leftarrow \delta TC$\\[4pt]
   \textbf{while} $\delta TC \ne \varnothing$\\
-  \quad $\delta TC \leftarrow \operatorname{deduplicate}(\textcolor{recursivequery}{\texttt{edge} \bowtie \delta TC}) - TC$\\
+  \quad {\scriptsize $\delta TC \leftarrow \operatorname{deduplicate}(\textcolor{recursivequery}{\pi_{a,b}(\texttt{edge} \bowtie \delta TC)}) - TC$}\\
   \quad $TC \leftarrow TC \cup \delta TC$\\
   \textbf{end}
   \end{tabular}\par
@@ -255,7 +255,7 @@
   \quad \tikz[remember picture,baseline=(deltastep.base)]{
     \node[delta highlight,rounded corners=2pt,
       inner xsep=3pt,inner ysep=2pt,outer sep=0pt] (deltastep)
-      {$\delta TC \leftarrow \operatorname{deduplicate}(\texttt{edge} \bowtie \delta TC) - TC$};}\\
+      {\scriptsize $\delta TC \leftarrow \operatorname{deduplicate}(\pi_{a,b}(\texttt{edge} \bowtie \delta TC)) - TC$};}\\
   \quad $TC \leftarrow TC \cup \delta TC$\\
   \textbf{end}\\[4pt]
   \end{tabular}
@@ -274,22 +274,24 @@
     \begin{tikzpicture}[remember picture,text=UHblack,
       every node/.style={font=\footnotesize,inner sep=3pt},
       every path/.style={draw=UHblack!75,line width=0.8pt}]
-      \node[font=\Large] (anti) at (2.2,0) {$\triangleleft$};
+      \node[font=\Large] (anti) at (2.2,0) {$\triangleright$};
       \node[align=center] (dedup) at (1.1,-0.9) {%
         deduplicate\vphantom{\underline{deduplicate}}\\
         (aggregate)\vphantom{\underline{(aggregate)}}};
       \node (tc) at (3.8,-0.9) {$TC$};
-      \node[font=\Large] (join) at (1.1,-1.75) {$\bowtie$};
-      \node (edge) at (0.2,-2.65) {%
+      \node (projection) at (1.1,-1.8) {$\pi_{a,b}$};
+      \node[font=\Large] (join) at (1.1,-2.6) {$\bowtie$};
+      \node (edge) at (0.2,-3.2) {%
         \alt<3->{\underline{\texttt{edge}}}{\texttt{edge}\vphantom{\underline{\texttt{edge}}}}};
-      \node (wt) at (2.0,-2.65) {$\delta TC$};
+      \node (wt) at (2.0,-3.2) {$\delta TC$};
       \path (anti) -- (dedup);
       \path (anti) -- (tc);
-      \path (dedup) -- (join);
+      \path (dedup) -- (projection);
+      \path (projection) -- (join);
       \path (join) -- (wt);
       \path (join) -- (edge);
       \node[font=\scriptsize,text=UHblack!65,anchor=west]
-        at (2.55,0) {left anti join};
+        at (2.55,0) {anti join};
     \end{tikzpicture}\par
   };
   \only<3->{\node[overlay,anchor=south east,font=\scriptsize,text=UHblack,
@@ -297,7 +299,7 @@
     {\underline{build hash table}};}
 \end{tikzpicture}
 }
-\par\vspace{0.1cm}
+\par\vspace{-0.2cm}
 \uncover<4->{%
 \begin{tikzpicture}[remember picture]
   \node[fill=UHred!6,draw=UHred!40,rounded corners=4pt,
@@ -321,21 +323,22 @@
 \end{frame}
 
 \begin{frame}{Combining deduplication and anti join}
-\optimizationlabel{2}{3}
 \renewcommand{\motivationpadding}{7pt}
 \renewcommand{\motivationtitlefont}{\normalsize\bfseries}
 \begin{columns}[c,onlytextwidth]
 \begin{column}{0.49\textwidth}
 \motivationcard{Join plan}
   {\centering
-  \begin{tikzpicture}[text=UHblack,
+  \begin{tikzpicture}[remember picture,text=UHblack,
     every node/.style={font=\footnotesize,inner sep=3pt},
     plan edge/.style={draw=UHblack!75,line width=0.8pt}]
     % Reserve the same space throughout the transformation.
-    \path[use as bounding box] (-0.25,0.4) rectangle (5,-3.1);
-    \node[font=\Large] (combinejoin) at (1.1,-1.75) {$\bowtie$};
-    \node (combineedge) at (0.2,-2.65) {\texttt{edge}};
-    \node (combinedelta) at (2.0,-2.65) {$\delta TC$};
+    \path[use as bounding box] (-0.25,0.4) rectangle (5,-3.65);
+    \node (combineprojection) at (1.1,-1.8) {$\pi_{a,b}$};
+    \node[font=\Large] (combinejoin) at (1.1,-2.6) {$\bowtie$};
+    \node (combineedge) at (0.2,-3.2) {\texttt{edge}};
+    \node (combinedelta) at (2.0,-3.2) {$\delta TC$};
+    \draw[plan edge] (combineprojection) -- (combinejoin);
     \node (combinetc) at (3.8,-0.9) {$TC$};
     \draw[plan edge] (combinejoin) -- (combineedge);
     \draw[plan edge] (combinejoin) -- (combinedelta);
@@ -344,40 +347,44 @@
       \only<2>{\tikzset{combine highlight/.style={
         fill=UHred!12,draw=UHred,rounded corners=3pt}}}
       \node[font=\Large,combine highlight] (combineanti) at (2.2,0)
-        {$\triangleleft$};
+        {$\underline{\triangleright}$};
       \node[align=center,combine highlight] (combinededup) at (1.1,-0.9)
-        {deduplicate\\(aggregate)};
-      \node[font=\scriptsize,text=UHblack!65,anchor=west]
-        at (2.55,0) {left anti join};
+        {\underline{deduplicate}\\\underline{(aggregate)}};
+      \node[font=\scriptsize,text=UHblack!65,anchor=west] (combineantilabel)
+        at (2.55,0) {anti join};
+      \node[overlay,anchor=south east,font=\scriptsize,text=UHblack,
+        inner sep=0pt] at (5.55,-3.65) {\underline{build hash table}};
       \draw[plan edge] (combineanti) -- (combinededup);
       \draw[plan edge] (combineanti) -- (combinetc);
-      \draw[plan edge] (combinededup) -- (combinejoin);
+      \draw[plan edge] (combinededup) -- (combineprojection);
+      \only<2>{%
+        \node[overlay,anchor=west,align=left,text width=5.7cm,
+          font=\small] (anticheck) at (6.0,0.15)
+          {Is this pair already in $TC$?};
+        \node[overlay,anchor=west,align=left,text width=5.7cm,
+          font=\small] (dedupcheck) at (6.0,-1.45)
+          {Has this pair already been produced in this iteration?};
+        \draw[overlay,-latex,UHred,line width=0.9pt,shorten >=3pt]
+          (combineantilabel.east) -- (anticheck.west);
+        \draw[overlay,-latex,UHred,line width=0.9pt,shorten >=3pt]
+          (combinededup.east) -- (2.6,-1.45) -- (dedupcheck.west);
+      }
     }
     \only<3->{%
       \node[align=center,fill=UHred!12,draw=UHred,
         rounded corners=3pt,inner sep=6pt] (combinedoperator) at (2.2,-0.15)
         {{\normalsize\bfseries AAJ}\\{\scriptsize AggregateAntiJoin}};
-      \draw[plan edge] (combinedoperator) -- (combinejoin);
+      \draw[plan edge] (combinedoperator) -- (combineprojection);
       \draw[plan edge] (combinedoperator) -- (combinetc);
     }
   \end{tikzpicture}\par
   }{UHred!6}
 \end{column}
 \begin{column}{0.46\textwidth}
-\uncover<2->{%
-\motivationcard{Two membership checks}
-  {{\small
-  \textbf{Deduplicate:} Has this pair already been produced in this iteration?\par
-  \vspace{5pt}
-  \textbf{Left anti join:} Is this pair already in $TC$?
-  }}{UHblack!3}
-}
 \uncover<3->{%
-\motivationcard{One shared hash set}
+\motivationcard{\textcolor{UHred}{Optimization~\overviewnumber{2}}}
   {{\small
-  Initialize the set with $TC$.\par
-  For each candidate, check and insert.\par
-  Emit the pair into $\delta TC$ only if it was newly inserted.
+  reuse the hash table built for in-iteration duplicate removal for the antijoin operation
   \par\vspace{5pt}
   Similar to a \textbf{GroupJoin}.
   }}{UHred!6}
@@ -398,6 +405,7 @@
     plan edge/.style={draw=UHblack!75,line width=0.8pt}]
     \path[use as bounding box] (-0.25,0.4) rectangle (5,-3.1);
     \node[font=\Large] (storagejoin) at (1.1,-1.75) {$\bowtie$};
+    \node (storageprojection) at (1.1,-0.95) {$\pi_{a,b}$};
     \node (storageedge) at (0.2,-2.65) {\texttt{edge}};
     \node (storagedelta) at (2.0,-2.65) {$\delta TC$};
     \alt<2->{\node (storagetc) at (3.8,-1.85) {$TC$};}
@@ -405,7 +413,8 @@
     \node[font=\normalsize] (storageoperator) at (2.2,-0.15) {AAJ};
     \draw[plan edge] (storagejoin) -- (storageedge);
     \draw[plan edge] (storagejoin) -- (storagedelta);
-    \draw[plan edge] (storageoperator) -- (storagejoin);
+    \draw[plan edge] (storageoperator) -- (storageprojection);
+    \draw[plan edge] (storageprojection) -- (storagejoin);
     \only<1>{\draw[plan edge] (storageoperator) -- (storagetc);}
     \only<2->{%
       \node[align=center,fill=UHred!12,draw=UHred,
@@ -495,14 +504,16 @@
     (-0.95,1.25) rectangle (4.65,4.95);
   \node[anchor=west,font=\normalsize\bfseries] at (-0.55,4.5) {Join plan};
   \node[font=\normalsize] (insertAAJ) at (1.65,3.85) {AAJ};
-  \node[font=\Large] (insertjoin) at (0.6,2.75) {$\bowtie$};
+  \node[font=\footnotesize] (insertprojection) at (0.6,3.15) {$\pi_{a,b}$};
+  \node[font=\Large] (insertjoin) at (0.6,2.45) {$\bowtie$};
   \node[font=\footnotesize] (insertedge) at (-0.2,1.8) {\texttt{edge}};
   \node[font=\footnotesize] (insertdelta) at (1.5,1.8) {$\delta TC$};
   \node[align=center,font=\scriptsize,draw=UHred,fill=UHred!12,
     rounded corners=3pt,inner sep=4pt] (insertrepartition) at (3.35,3.1)
     {Hash\\Repartition};
   \node[font=\footnotesize] (insertTC) at (3.35,1.8) {$TC$};
-  \draw[plan edge] (insertAAJ) -- (insertjoin);
+  \draw[plan edge] (insertAAJ) -- (insertprojection);
+  \draw[plan edge] (insertprojection) -- (insertjoin);
   \draw[plan edge] (insertjoin) -- (insertedge);
   \draw[plan edge] (insertjoin) -- (insertdelta);
   \draw[plan edge] (insertAAJ) -- (insertrepartition);
@@ -515,8 +526,8 @@
   \node[chunk] at (8,6.8) {$\delta TC_{i}$};
   \node[chunk,draw=UHred,fill=UHred!10] (tcnext) at (10.3,6.8) {};
   \draw[UHblack!65,line width=0.9pt]
-    (-1,7.8) -- (-1,8.05) -- (9,8.05) -- (9,7.8);
-  \node[anchor=south,font=\large] at (4,8.15)
+    (-1,7.8) -- (-1,8.05) -- (11.3,8.05) -- (11.3,7.8);
+  \node[anchor=south,font=\large] at (5.15,8.15)
     {$TC = \displaystyle\bigcup_{k=0}^{i} \delta TC_{k}$};
   \draw[-latex,UHred,line width=1.2pt,rounded corners=5pt]
     (insertAAJ.north) -- (1.65,5.35) -- (10.3,5.35) -- (tcnext.south);
@@ -549,7 +560,7 @@
     }
     \node[draw=\partitioncolor!65!black,fill=white,
       rounded corners=2pt,minimum width=1.35cm,minimum height=0.4cm,
-      inner sep=1pt] (partitionnext\partitionindex) at (8.75,\partitiony) {};
+      inner sep=1pt,line width=1.5pt] (partitionnext\partitionindex) at (8.75,\partitiony) {};
     \node[font=\normalsize,text=\partitioncolor!65!black]
       at (5.95,\partitiony) {$\cdots$};
   }
@@ -564,21 +575,23 @@
   \node[align=center,font=\scriptsize,draw=UHred,fill=UHred!12,
     rounded corners=3pt,inner sep=4pt] (hoistedrepartition) at (2.2,2.95)
     {Hash Repartition};
-  \node[font=\normalsize] (partitionedAAJ) at (2.2,1.7) {AAJ};
-  \node[font=\Large] (partitionedjoin) at (1,0.65) {$\bowtie$};
+  \node[font=\normalsize] (partitionedAAJ) at (2.2,2) {AAJ};
+  \node[font=\footnotesize] (partitionedprojection) at (1,1.15) {$\pi_{a,b}$};
+  \node[font=\Large] (partitionedjoin) at (1,0.35) {$\bowtie$};
   \node[font=\footnotesize] (partitionededge) at (0,-0.35) {\texttt{edge}};
   \node[font=\footnotesize] (partitioneddelta) at (2,-0.35) {$\delta TC$};
   \node[font=\footnotesize] (partitionedTC) at (4,0.65) {$TC$};
   \draw[plan edge] (hoistedrepartition) -- (partitionedAAJ);
-  \draw[plan edge] (partitionedAAJ) -- (partitionedjoin);
+  \draw[plan edge] (partitionedAAJ) -- (partitionedprojection);
+  \draw[plan edge] (partitionedprojection) -- (partitionedjoin);
   \draw[plan edge] (partitionedAAJ) -- (partitionedTC);
   \draw[plan edge] (partitionedjoin) -- (partitionededge);
   \draw[plan edge] (partitionedjoin) -- (partitioneddelta);
   \foreach \partitionindex/\partitioncolor in {0/blue,1/teal,2/orange} {
     \draw[-latex,draw=\partitioncolor!75!black,line width=1pt]
       (hoistedrepartition.east)
-      -- ({5.6+0.3*\partitionindex},{3.8-0.3*\partitionindex})
-      -- ({10.1+0.3*\partitionindex},{3.8-0.3*\partitionindex})
+      -- ({5.6+0.3*\partitionindex},{3.2+0.3*\partitionindex})
+      -- ({10.7-0.3*\partitionindex},{3.2+0.3*\partitionindex})
       |- (partitionnext\partitionindex.east);
   }
 \end{tikzpicture}%
@@ -604,23 +617,25 @@
       \only<2->{\tikzset{anti highlight/.style={draw=UHred,fill=UHred!12,
         rounded corners=3pt}}}
       \node[font=\Large,anti highlight] (newanti) at (2.2,0)
-        {\alt<2->{$\triangleright$}{$\triangleleft$}};
+        {$\triangleright$};
       \node[align=center] (newdedup) at (1.1,-0.9)
         {deduplicate\vphantom{\underline{deduplicate}}\\
         (aggregate)\vphantom{\underline{(aggregate)}}};
       \node (newtc) at (3.8,-0.9)
         {\alt<2->{$\underline{TC}$}{$TC\vphantom{\underline{TC}}$}};
-      \node[font=\Large] (newjoin) at (1.1,-1.75) {$\bowtie$};
-      \node (newedge) at (0.2,-2.65)
+      \node (newprojection) at (1.1,-1.8) {$\pi_{a,b}$};
+      \node[font=\Large] (newjoin) at (1.1,-2.6) {$\bowtie$};
+      \node (newedge) at (0.2,-3.2)
         {\alt<2->{\underline{\texttt{edge}}}{\texttt{edge}\vphantom{\underline{\texttt{edge}}}}};
-      \node (newdelta) at (2.0,-2.65) {$\delta TC$};
+      \node (newdelta) at (2.0,-3.2) {$\delta TC$};
       \path (newanti) -- (newdedup);
       \path (newanti) -- (newtc);
-      \path (newdedup) -- (newjoin);
+      \path (newdedup) -- (newprojection);
+      \path (newprojection) -- (newjoin);
       \path (newjoin) -- (newdelta);
       \path (newjoin) -- (newedge);
       \node[font=\scriptsize,text=UHblack!65,anchor=west]
-        at (2.65,0) {\alt<2->{right anti join}{left anti join}};
+        at (2.65,0) {anti join};
     \end{tikzpicture}\par
   };
   \only<2->{\node[overlay,anchor=south east,font=\scriptsize,text=UHblack,
