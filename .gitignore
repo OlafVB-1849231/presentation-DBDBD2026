@@ -24,6 +24,15 @@
 /Beamer_test.pdf
 /DBDBD2026_presentation.pdf
 
+# Python caches and local environments, including timings_analysis subfolders
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
 # Editor and operating system files
 *~
 *.swp

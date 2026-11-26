@@ -1,0 +1,13 @@
+Benchmarks,datafusion-Base,datafusion-Base-Edge
+TC on P40,,
+TC on c2000,,
+TC on c3000,,
+TC on c4000,,
+TC on m4096_2,,
+TC on p2000,,
+TC on p3000,,
+TC on p4000,,
+TC on y1000_4000,,
+TC on y1000_8000,,
+TC on y500_4000,,
+TC on y500_8000,,
