@@ -244,6 +244,74 @@
 % \href{https://zedware.github.io/homepage/db/sql99-known-as-sql3.pdf}{SQL:1999, formerly known as SQL3}.\par}
 \end{frame}
 
+\begin{frame}{Semi-naive evaluation: delta and accumulated TC}
+\definecolor{anchorquery}{HTML}{0072B2}
+\definecolor{recursivequery}{HTML}{B35C00}
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[text=UHblack,
+  code line/.style={anchor=base west,font=\small,inner sep=0pt},
+  delta arrow/.style={-latex,UHred,line width=0.8pt,rounded corners=3pt},
+  closure arrow/.style={-latex,teal!75!black,line width=0.8pt}]
+  % Keep the algorithm and notation from the semi-naive box on slide 3.
+  \draw[fill=UHblack!3,draw=UHblack!15,rounded corners=4pt]
+    (0,0) rectangle (8.7,5.2);
+  \node[anchor=west,font=\normalsize\bfseries] at (0.35,4.75)
+    {Semi-naive evaluation};
+  \node[code line] at (0.4,4.05)
+    {$\delta TC\leftarrow\operatorname{deduplicate}(\textcolor{anchorquery}{\texttt{edge}})$};
+  \node[code line] at (0.4,3.5) {$TC\leftarrow\delta TC$};
+  \node[code line] at (0.4,2.75) {\textbf{while} $\delta TC\ne\varnothing$};
+  \node[code line,font=\footnotesize] (semassign) at (0.8,2.05)
+    {$\delta TC\leftarrow\operatorname{deduplicate}(\textcolor{recursivequery}{\pi_{a,b}(\texttt{edge}\bowtie{}}$};
+  \node[code line,font=\footnotesize,text=recursivequery]
+    (semreadDelta) at (semassign.base east) {$\delta TC$};
+  \node[code line,font=\footnotesize] (semclose) at (semreadDelta.base east)
+    {$))-{}$};
+  \node[code line,font=\footnotesize] (semreadTC) at (semclose.base east) {$TC$};
+  \node[code line] (semappend) at (0.8,1.3) {$TC\leftarrow TC\cup\delta TC$};
+  \node[code line] at (0.4,0.6) {\textbf{end}};
+
+  % One storage view: the latest delta is part of the accumulated TC.
+  \draw[draw=teal!60!black,fill=teal!3,rounded corners=4pt]
+    (10.8,0.3) rectangle (13.8,4.8);
+  \coordinate (semstorageKnown) at (10.8,2.55);
+  \node[font=\normalsize\bfseries,inner sep=3pt] (semstorageTC) at (12.3,4.3) {$TC$};
+  \node[draw=UHblack!20,fill=white,rounded corners=3pt,
+    minimum width=2.2cm,minimum height=1.15cm,align=center,font=\small]
+    at (12.3,3.15) {Earlier pairs};
+  \node[draw=UHred!60,fill=UHred!6,rounded corners=3pt,
+    minimum width=2.2cm,minimum height=0.8cm,font=\small]
+    (semstorageDelta) at (12.3,1.8) {$\delta TC$};
+  \node[draw=UHred!60,fill=UHred!6,densely dotted,rounded corners=3pt,
+    minimum width=2.2cm,minimum height=0.6cm]
+    (semstorageAppend) at (12.3,0.8) {};
+
+  \draw[delta arrow] (semstorageDelta.west) --
+    node[below,font=\footnotesize,text=UHred,fill=white,inner sep=2pt]
+      {Read only the delta tuples}
+    (semreadDelta.south |- semstorageDelta.west) -- (semreadDelta.south);
+  \draw[closure arrow] (semstorageKnown) --
+    node[above,sloped,font=\footnotesize,text=teal!75!black,fill=white,inner sep=2pt]
+      {}
+    (semreadTC.north east);
+  \draw[delta arrow,densely dotted] (semappend.east) --
+    node[below,sloped,font=\footnotesize,text=UHred,fill=white,inner sep=2pt]
+      {Append the new delta}
+    (semstorageAppend.west);
+\end{tikzpicture}%
+}
+\note{The pseudocode uses the same mutable delta TC and TC variables as slide 3,
+without introducing iteration indices or additional intermediate variables.
+At the start of an iteration, delta TC is the latest part of accumulated TC.
+The red input arrow connects that delta to the recursive join. The teal arrow
+connects all accumulated TC to the subtraction that removes known pairs.
+After the delta assignment, delta TC contains only the newly discovered pairs;
+the append line adds those pairs to TC. The storage picture shows the current
+state, and the append arrow shows how the next state is formed. The while loop
+repeats with the updated variables until delta TC is empty.}
+\end{frame}
+
 \begin{frame}{Adding loop hoisting optimizations}
 \tikzset{delta highlight/.style={fill=UHblack!3}}
 \only<2->{\tikzset{delta highlight/.style={fill=UHred!10}}}
@@ -405,7 +473,7 @@
 \begin{column}{0.49\textwidth}
 \motivationcard{Join plan}
   {\centering
-  \begin{tikzpicture}[text=UHblack,
+  \begin{tikzpicture}[remember picture,text=UHblack,
     every node/.style={font=\footnotesize,inner sep=3pt},
     plan edge/.style={draw=UHblack!75,line width=0.8pt}]
     \only<1>{\path[use as bounding box] (-0.25,0.4) rectangle (5,-3.1);}
@@ -427,8 +495,10 @@
     \draw[plan edge] (storageprojection) -- (storagejoin);
     \only<1>{\draw[plan edge] (storageoperator) -- (storagetc);}
     \only<2->{%
-      \node[align=center,fill=UHred!12,draw=UHred,
-        rounded corners=3pt,inner sep=5pt] (storagecandidaterepartition) at (1.1,-0.9)
+      \tikzset{candidate partition box/.style={fill=UHred!12,draw=UHred,
+        rounded corners=3pt,inner sep=5pt}}
+      \only<3->{\tikzset{candidate partition box/.style={inner sep=5pt}}}
+      \node[align=center,candidate partition box] (storagecandidaterepartition) at (1.1,-0.9)
         {Hash\\Repartition};
       \draw[plan edge] (storageoperator) -- (storagecandidaterepartition);
       \draw[plan edge] (storagecandidaterepartition) -- (storageprojection);
@@ -444,51 +514,14 @@
 \begin{column}{0.46\textwidth}
 \uncover<2->{%
 \motivationcard{In multithreaded scenario:}
-  {inputs needs to be hash partitioned}{UHred!6}
-}
-\end{column}
-\end{columns}
-\end{frame}
-
-% Copy of slide 6's second overlay, with the partition-distribution explanation.
-\begin{frame}{incremental hash partitioned storage}
-\renewcommand{\motivationpadding}{7pt}
-\renewcommand{\motivationtitlefont}{\normalsize\bfseries}
-\begin{columns}[c,onlytextwidth]
-\begin{column}{0.49\textwidth}
-\motivationcard{Join plan}
-  {\centering
-  \begin{tikzpicture}[text=UHblack,
-    every node/.style={font=\footnotesize,inner sep=3pt},
-    plan edge/.style={draw=UHblack!75,line width=0.8pt}]
-    \path[use as bounding box] (-0.25,0.4) rectangle (5,-4.05);
-    \node[font=\normalsize] (explainAAJ) at (2.2,-0.15) {AAJ};
-    \node[align=center,fill=UHred!12,draw=UHred,
-      rounded corners=3pt,inner sep=5pt] (explainleft) at (1.1,-0.9)
-      {Hash\\Repartition};
-    \node[align=center,fill=UHred!12,draw=UHred,
-      rounded corners=3pt,inner sep=5pt] (explainright) at (3.8,-0.9)
-      {Hash\\Repartition};
-    \node (explainprojection) at (1.1,-1.85) {$\pi_{a,b}$};
-    \node[font=\Large] (explainjoin) at (1.1,-2.65) {$\bowtie$};
-    \node (explainedge) at (0.2,-3.55) {\texttt{edge}};
-    \node (explaindelta) at (2,-3.55) {$\delta TC$};
-    \node (explainTC) at (3.8,-1.85) {$TC$};
-    \draw[plan edge] (explainAAJ) -- (explainleft);
-    \draw[plan edge] (explainleft) -- (explainprojection);
-    \draw[plan edge] (explainprojection) -- (explainjoin);
-    \draw[plan edge] (explainjoin) -- (explainedge);
-    \draw[plan edge] (explainjoin) -- (explaindelta);
-    \draw[plan edge] (explainAAJ) -- (explainright);
-    \draw[plan edge] (explainright) -- (explainTC);
-  \end{tikzpicture}\par
-  }{UHred!6}
-\end{column}
-\begin{column}{0.46\textwidth}
-\motivationcard{In multithreaded scenario:}
   {Both inputs must be hash partitioned.}{UHred!6}
+}
+% Reserve the diagram's space so the explanation stays fixed on overlays 2 and 3.
+\uncover<3->{%
 \vspace{4pt}
 \centering
+\begin{tikzpicture}[remember picture]
+\node[inner sep=0pt,outer sep=0pt] (repartitionvisual) {%
 \resizebox{0.94\linewidth}{!}{%
 \begin{tikzpicture}[text=UHblack,
   chunk/.style={draw=UHblack!35,fill=UHblack!3,rounded corners=2pt,
@@ -516,71 +549,23 @@
     }
   }
 \end{tikzpicture}%
+}};
+\end{tikzpicture}
 }
 \end{column}
 \end{columns}
+\only<3->{%
+\begin{tikzpicture}[remember picture,overlay]
+  \draw[-latex,UHred,line width=0.8pt,shorten <=2pt,shorten >=1pt]
+    (storagerepartition.east) --
+    node[above,sloped,font=\footnotesize\bfseries,text=UHred,
+      fill=white,inner sep=2pt] {Partition TC}
+    (repartitionvisual.west);
+\end{tikzpicture}}
 \end{frame}
 
 \begin{frame}{TC in memory}
 \centering
-\only<1>{%
-\begin{tikzpicture}[text=UHblack,
-  chunk/.style={draw=UHblack!35,fill=UHblack!3,rounded corners=3pt,
-    minimum width=1.9cm,minimum height=1.15cm,font=\large},
-  grouping/.style={draw=UHblack!65,line width=0.9pt}]
-  \node[chunk] (tcfirst) at (0,0) {$\delta TC_{0}$};
-  \node[chunk] at (2.3,0) {$\delta TC_{1}$};
-  \node[chunk] at (4.6,0) {$\delta TC_{2}$};
-  \node[font=\Large] at (6.9,0) {$\cdots$};
-  \node[chunk,draw=UHred,fill=UHred!10] (tclast) at (9.2,0) {$\delta TC_{i}$};
-
-  \draw[grouping] (-0.95,0.85) -- (-0.95,1.1) -- (10.15,1.1) -- (10.15,0.85);
-  \node[anchor=south,font=\large] at (4.6,1.2)
-    {$TC = \displaystyle\bigcup_{k=0}^{i} \delta TC_{k}$};
-
-  \draw[UHred,line width=0.9pt] (8.25,-0.85) -- (8.25,-1.1)
-    -- (10.15,-1.1) -- (10.15,-0.85);
-  \node[anchor=north,font=\large,text=UHred] at (9.2,-1.2)
-    {$\delta TC = \delta TC_{i}$};
-\end{tikzpicture}
-}
-\only<3->{%
-\begin{tikzpicture}[text=UHblack,
-  chunk/.style={draw=UHblack!35,fill=UHblack!3,rounded corners=3pt,
-    minimum width=1.9cm,minimum height=1.15cm,font=\normalsize},
-  flow/.style={-latex,draw=UHblack!65,line width=1pt}]
-  \draw[UHblack!65,line width=0.9pt]
-    (-0.95,3.1) -- (-0.95,3.35) -- (10.15,3.35) -- (10.15,3.1);
-  \node[anchor=south,font=\large] at (4.6,3.45)
-    {$TC = \displaystyle\bigcup_{k=0}^{i} \delta TC_{k}$};
-  \node[chunk] (partitioninputzero) at (0,2.25) {$\delta TC_{0}$};
-  \node[chunk] (partitioninputone) at (2.3,2.25) {$\delta TC_{1}$};
-  \node[chunk] (partitioninputtwo) at (4.6,2.25) {$\delta TC_{2}$};
-  \node[font=\Large] at (6.9,2.25) {$\cdots$};
-  \node[chunk] (partitioninputlast) at (9.2,2.25) {$\delta TC_{i}$};
-  \node[draw=UHred,fill=UHred!6,rounded corners=3pt,
-    anchor=east,align=center,font=\small,inner sep=5pt] at (-0.8,0.65)
-    {Hash Repartition\\operator};
-
-  % Each color identifies one output partition.
-  \foreach \partitionindex/\partitionx/\partitioncolor/\sourceoffset in
-    {0/0.6/blue/-12pt,1/4.6/teal/0pt,2/8.6/orange/12pt} {
-    \node[draw=\partitioncolor!75!black,fill=\partitioncolor!9,
-      rounded corners=4pt,minimum width=2.65cm,minimum height=1.5cm,
-      font=\small,text=\partitioncolor!65!black]
-      (outputpartition\partitionindex) at (\partitionx,-1.15)
-      {partition \partitionindex};
-    \foreach \sourcechunk/\targetoffset in
-      {partitioninputzero/-27pt,partitioninputone/-9pt,partitioninputtwo/9pt,partitioninputlast/27pt} {
-      \draw[-latex,draw=\partitioncolor!75!black,line width=1pt]
-        ([xshift=\sourceoffset]\sourcechunk.south)
-        --
-        ([xshift=\targetoffset]outputpartition\partitionindex.north);
-    }
-  }
-\end{tikzpicture}
-}
-\only<2>{%
 \begin{tikzpicture}[text=UHblack,x=0.95cm,y=0.8cm,
   chunk/.style={draw=UHblack!35,fill=UHblack!3,rounded corners=3pt,
     minimum width=1.9cm,minimum height=1.15cm,font=\normalsize},
@@ -623,7 +608,79 @@
   \node[font=\small,text=UHred,anchor=south] at (7,5.5) {Insert output};
 
 \end{tikzpicture}
+\end{frame}
+
+% Follow the output of iteration i into both inputs of iteration i+1.
+\begin{frame}{TC from one iteration to the next}
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[text=UHblack,x=0.95cm,y=0.9cm,
+  plan edge/.style={draw=UHblack!75,line width=0.8pt},
+  chunk/.style={draw=UHblack!35,fill=UHblack!3,rounded corners=3pt,
+    minimum width=1.45cm,minimum height=0.6cm,font=\small},
+  delta flow/.style={-latex,UHred,line width=1.3pt,rounded corners=5pt},
+  closure flow/.style={-latex,teal!75!black,line width=1.3pt,rounded corners=5pt}]
+  % Keep the two plans at the same scale, with the growing relation between them.
+  \foreach \planprefix/\planshift/\iterationlabel in {current/0/i,next/8.8/{i+1}} {
+    \begin{scope}[xshift=\planshift*0.95cm]
+      \draw[fill=UHred!6,draw=UHblack!15,rounded corners=4pt]
+        (-0.55,0.65) rectangle (4.3,5.9);
+      \node[anchor=west,font=\normalsize\bfseries] at (-0.3,5.5)
+        {Join plan iteration $\iterationlabel$};
+      \node[font=\normalsize] (\planprefix AAJ) at (1.65,4.8) {AAJ};
+      \node[align=center,font=\scriptsize,inner sep=1pt]
+        (\planprefix candidates) at (0.6,4.05) {Hash\\Repartition};
+      \node[font=\footnotesize] (\planprefix projection) at (0.6,3.25) {$\pi_{a,b}$};
+      \node[font=\Large] (\planprefix join) at (0.6,2.35) {$\bowtie$};
+      \node[font=\footnotesize] (\planprefix edge) at (-0.1,1.45) {\texttt{edge}};
+      \node[font=\footnotesize] (\planprefix delta) at (1.4,1.45)
+        {$\delta TC_{\iterationlabel}$};
+      \node[align=center,font=\scriptsize,draw=UHred,fill=UHred!12,
+        rounded corners=3pt,inner sep=4pt] (\planprefix repartition) at (3.2,4.05)
+        {Hash\\Repartition};
+      \node[font=\footnotesize] (\planprefix TC) at (3.2,2.7) {$TC$};
+      \draw[plan edge] (\planprefix AAJ) -- (\planprefix candidates);
+      \draw[plan edge] (\planprefix candidates) -- (\planprefix projection);
+      \draw[plan edge] (\planprefix projection) -- (\planprefix join);
+      \draw[plan edge] (\planprefix join) -- (\planprefix edge);
+      \draw[plan edge] (\planprefix join) -- (\planprefix delta);
+      \draw[plan edge] (\planprefix AAJ) -- (\planprefix repartition);
+      \draw[plan edge] (\planprefix repartition) -- (\planprefix TC);
+    \end{scope}
+  }
+
+  \node[anchor=south,font=\small] at (6.1,5.35)
+    {$TC=\displaystyle\bigcup_{k=0}^{i+1}\delta TC_k$};
+  \node[chunk] at (6.15,4.7) {$\delta TC_0$};
+  \node[chunk] at (6.15,3.8) {$\delta TC_1$};
+  \node[font=\large] at (6.15,2.9) {$\vdots$};
+  \node[chunk] at (6.15,2) {$\delta TC_i$};
+  \node[chunk,draw=UHred,fill=UHred!10] (iterationnewchunk) at (6.15,1.1)
+    {$\delta TC_{i+1}$};
+  % The bracket groups the whole accumulated TC, including the new chunk.
+  \draw[teal!75!black,line width=1pt]
+    (7.05,5.1) -- (7.3,5.1) -- (7.3,0.7) -- (7.05,0.7);
+  \coordinate (iterationTCgroup) at (7.3,2.9);
+
+  \draw[delta flow] (currentAAJ.east) -- (4.7,4.8)
+    -- (4.7,1.1) -- (iterationnewchunk.west);
+  \node[rotate=90,font=\footnotesize,text=UHred,fill=white,inner sep=2pt]
+    at (4.7,3) {Insert output};
+  \draw[delta flow] (iterationnewchunk.south) -- (6.15,0.15)
+    -- (10.2,0.15) -- (nextdelta.south);
+  \node[anchor=south,font=\footnotesize,text=UHred,fill=white,inner sep=2pt]
+    at (8.2,0.2) {Next delta};
+  \draw[closure flow] (iterationTCgroup) -- (7.8,2.9) -- (7.8,6.35)
+    -- (13.9,6.35) -- (13.9,2.7) -- (nextTC.east);
+  \node[anchor=south,font=\footnotesize,text=teal!75!black,fill=white,inner sep=2pt]
+    at (10.65,6.4) {Full accumulated TC};
+\end{tikzpicture}%
 }
+\note{Iteration i consumes delta TC i and the closure accumulated through i,
+then appends its new output as delta TC i+1. The next iteration consumes that
+new chunk as its delta, while its TC input refers to the entire relation,
+including the new chunk. The red arrows trace the new output and its reuse;
+the teal bracket and arrow trace the complete accumulated closure.}
 \end{frame}
 
 \begin{frame}{incremental hash partitioned storage}
@@ -810,205 +867,8 @@
 
 
 
-% Slide 12: supplied speedup chart, with near-parity gains condensed into a range.
-\begin{frame}{Edge reuse: large gains for a small group}
-\vspace{8pt}
-{\small
-\begin{tabular*}{\textwidth}{@{}l@{\extracolsep{\fill}}ll@{}}
-  \textcolor{UHred}{\textbf{6 datasets} $\Uparrow$ large speedup} &
-  \textcolor{red1}{\textbf{28 datasets} $\uparrow$ small speedup} &
-  \textcolor{UHblack!70}{\textbf{8 datasets} $\downarrow$ small slowdown}
-\end{tabular*}\par}
-\vspace{4pt}
-\makebox[\textwidth][c]{\includegraphics[width=0.96\textwidth]{charts/edge_speedup_condensed_vertical.pdf}}
-\note{The supplied chart compares the exact timings.csv columns datafusion-Base
-and datafusion-Base-Edge within each benchmark row and Run ID. It uses reported
-CSV values without further aggregation, rather than recomputing medians from
-repeat-level events. There are 42 paired positive timings and 12 unavailable
-or invalid pairs. Speedup is Base runtime divided by Base-Edge runtime:
-1x is equal runtime, above 1x favors Base-Edge, and below 1x is a regression.
-The six largest speedups are P131 (1.983x), b19 (1.503x), b18 (1.439x),
-b17 (1.298x), TREE11 (1.200x), and P279 (1.153x).
-The hatched interval bar spans exactly 1.001x to 1.043x and represents 28
-datasets in that inclusive range. It is not a mean, sum, or measured group
-speedup. Eight datasets have speedups below 1x.
-Repeat-level timings and uncertainty are not provided in the chart's CSV source.
-Original chart: /home/olaf/PhD/research/timings\_analysis/charts/base\_to\_edge/edge\_speedup\_condensed\_vertical.pdf.}
-\end{frame}
-
-% Slide 13: interpret the three groups shown in the speedup chart.
-\begin{frame}{Edge reuse: three performance groups}
-\renewcommand{\motivationtitlefont}{\normalsize\bfseries}
-\renewcommand{\motivationbodyfont}{\small}
-\renewcommand{\motivationpadding}{7pt}
-\renewcommand{\motivationgap}{7pt}
-\renewcommand{\motivationtextgap}{4pt}
-\vspace{8pt}
-\motivationcard{\textcolor{UHred}{6 datasets $\Uparrow$ Large speedup ($\geq 1.153\times$)}}
-  {\textbf{edges $\geq 50{,}000$ \quad AND \quad rule instances / edges $\leq 32$}\par
-   \vspace{5pt}
-   Reusing a large edge hash table saves more work. The speedup is substantial
-   when this saving is large relative to candidate processing.}{UHred!6}
-\motivationcard{\textcolor{red1}{28 datasets $\uparrow$ Small speedup (1.001--1.043$\times$)}}
-  {}{UHblack!3}
-\motivationcard{\textcolor{UHblack!70}{8 datasets $\downarrow$ Small slowdown ($< 1\times$)}}
-  {Slowdowns are tiny in absolute time.\par
-   \textbf{m4\_2048}, the largest relative slowdown, adds only
-   \textbf{0.001 second (1 ms)}.}{UHblack!3}
-\note{The rule edges >= 50,000 AND rule\_instances / edges <= 32 selects
-exactly TREE11, b17, b18, b19, P131 and P279 out of the 54 datasets.
-The chart's three groups are six large speedups, 28 small speedups, and eight
-small slowdowns. The largest relative slowdown, m4\_2048, adds only 0.001 second
-(1 millisecond) in absolute runtime.
-Rule instances count logical rule-body matches, including candidates later
-discarded; dividing by edge count measures candidate-generation work per input
-edge. The measured metadata (edges; edges/nodes; iterations; rule instances/edge)
-are: TREE11 (71,263; 1.00; 11; 10.37), b17 (131,070; 1.00; 16; 15.00),
-b18 (262,142; 1.00; 17; 16.00), b19 (524,286; 1.00; 18; 17.00),
-P131 (10,596,936; 1.05; 8; 3.92), P279 (3,127,933; 1.23; 22; 28.72).
-The speedups on slide 12 use the reported CSV timings, as documented in that
-chart, without repeat-level uncertainty or a formal significance test.
-Comparing Base.json and Base+Edge.json, the only plan difference is a recursive
-HASHJOIN becoming REUSEEDBHASHJOIN. Saving edge hash builds is a mechanism-based
-interpretation; timings alone do not establish the cost breakdown.
-Dense k1000 and long-path p1000 illustrate high candidate work. Small, shallow
-m4\_2048 has little hash-building work to save. P40 is large and sparse but has
-approximately 2,171 rule instances per edge and 127 iterations; its runs timed
-out, so its speedup cannot be assessed.
-An alternative descriptive rule, nodes >= 50,000 AND iterations <= 32, also
-selects exactly these six: large, sparse graphs with shallow reachability.
-The group includes cyclic and acyclic graphs and very different maximum
-degrees, so cyclicity and maximum degree are weaker discriminators.
-Both rules fit this benchmark collection; numerical thresholds require
-validation on additional datasets. Rule instances and iterations are
-closure-derived and would require estimates or sampling before execution.}
-\end{frame}
-
-% Slides 14--15: incremental effect of adding AAJ to Base+Edge.
-\begin{frame}{AAJ: mostly small gains}
-\vspace{8pt}
-{\small
-\begin{tabular*}{\textwidth}{@{}l@{\extracolsep{\fill}}ll@{}}
-  \textcolor{UHred}{\textbf{4 datasets} $\Uparrow$ larger speedup} &
-  \textcolor{red1}{\textbf{37 datasets} $\uparrow$ small speedup} &
-  \textcolor{UHblack!70}{\textbf{1 dataset} $\downarrow$ small slowdown}
-\end{tabular*}\par}
-\vspace{4pt}
-\makebox[\textwidth][c]{\includegraphics[width=0.96\textwidth]{timings_analysis/charts/edge_to_aaj/edge_speedup_condensed_vertical.pdf}}
-\note{Generated with timings\_analysis/plot\_timings.py from timings.csv.
-This is the incremental AAJ comparison: Base+Edge divided by Base+Edge+AAJ,
-not Base divided by Base+Edge+AAJ. There are 42 valid pairs and 12 exclusions.
-Four speedups exceed 1.062: G5K 1.187x, G10K 1.137x,
-P131 1.105x, P279 1.086x. The 37 other gains include 36 in the
-hatched 1.001--1.062 interval and m256\_32 at approximately 1.0004x, displayed separately
-and rounded to 1.000x. TREE11 is the only slowdown, 0.984848485x.
-The hatched bar is a range, not an average. No significance test is available.
-Joined timings and measured metadata are in timings\_analysis/optimization\_summary.json.}
-\end{frame}
-
-\begin{frame}{AAJ: three performance groups}
-\renewcommand{\motivationtitlefont}{\normalsize\bfseries}
-\renewcommand{\motivationbodyfont}{\small}
-\renewcommand{\motivationpadding}{7pt}
-\renewcommand{\motivationgap}{7pt}
-\renewcommand{\motivationtextgap}{4pt}
-\vspace{8pt}
-\motivationcard{\textcolor{UHred}{4 datasets $\Uparrow$ Larger speedup ($>1.062\times$)}}
-  {\textbf{$|TC|$ / productive rounds $\geq 2{,}000{,}000$}\par
-   \textbf{AND \quad rule instances / $|TC|$ $\leq 32$}\par
-   \vspace{5pt}
-   AAJ shares hashing work between deduplication and anti join.
-   A large TC makes separate anti-join hashing expensive; candidate processing can dilute the saving.}{UHred!6}
-\motivationcard{\textcolor{red1}{37 datasets $\uparrow$ Small speedup ($1 < {}\mathrm{speedup}\leq 1.062\times$)}}
-  {}{UHblack!3}
-\motivationcard{\textcolor{UHblack!70}{1 dataset $\downarrow$ Small slowdown ($<1\times$)}}
-  {\textbf{TREE11}: 0.985$\times$, adding only \textbf{0.001 second (1 ms)}.}{UHblack!3}
-\note{The candidate metadata rule TC size / productive rounds >= 2,000,000
-AND rule instances / TC size <= 32 selects exactly G5K, G10K, P131 and P279
-among the 42 datasets with valid AAJ timings, with no false positives or
-false negatives in this collection. Across all 54 metadata records it also
-selects P40, whose timed-out runs prevent speedup assessment. This replaces
-the previous large-closure/shallow-recursion condition with average useful
-output per round and candidate amplification. Productive rounds include the
-initial edge-derived result and exclude the final empty result. Average new
-TC pairs per round and rule instances per TC pair are respectively G5K
-(2.248 million; 5.008), G10K (14.286 million; 9.981), P131 (4.981 million;
-1.042), and P279 (3.534 million; 1.156). Both this and the previous condition
-fit the measured collection; improved out-of-sample prediction is not established.
-Their (TC size; iterations) are G5K (24,730,729; 11), G10K (100,000,000; 7),
-P131 (39,845,940; 8), P279 (77,740,410; 22).
-GRID150 is an important counterexample to closure size alone: 131,675,775 pairs,
-300 iterations, but only 1.053x AAJ speedup. Dense k2000 discards about 99.9 percent
-of candidates in aggregation but gains only 1.018x, so duplicate fraction alone
-does not identify the larger gains. These are descriptive associations, not a
-validated optimizer rule or a measured cost breakdown. AAJ combines the
-deduplication and anti-join work as introduced earlier in this deck.
-The closure-derived metadata would require estimates or sampling before execution.
-TREE11's CSV runtimes are 0.065 s with Edge and 0.066 s with AAJ.
-No repeat-level uncertainty or significance test is available.}
-\end{frame}
-
-% Slides 16--17: incremental effect of adding PartTC to Base+Edge+AAJ.
-\begin{frame}{PartTC: larger gains across many datasets}
-\vspace{8pt}
-{\small
-\begin{tabular*}{\textwidth}{@{}l@{\extracolsep{\fill}}ll@{}}
-  \textcolor{UHred}{\textbf{24 datasets} $\Uparrow$ larger speedup} &
-  \textcolor{red1}{\textbf{16 datasets} $\uparrow$ small speedup} &
-  \textcolor{UHblack!70}{\textbf{2 datasets} $\downarrow$ small slowdown}
-\end{tabular*}\par}
-\vspace{4pt}
-\makebox[\textwidth][c]{\includegraphics[width=0.96\textwidth]{timings_analysis/charts/aaj_to_parttc/edge_speedup_condensed_vertical.pdf}}
-\note{Generated with timings\_analysis/plot\_timings.py from timings.csv.
-This is the incremental PartTC comparison: Base+Edge+AAJ divided by
-Base+Edge+AAJ+PartTC. There are 42 valid pairs and 12 exclusions.
-24 speedups exceed 1.070. The 16 smaller gains include 15 datasets in the
-hatched 1.001--1.070 range and k1000 at approximately 1.0008x, displayed separately
-and rounded to 1.001x. Its unrounded value falls below the condensed interval.
-Two datasets regress: u2000\_1000000 and u2000\_500000.
-The range bar is not an average. All ratios use reported CSV timings without
-further aggregation or repeat-level uncertainty. Detailed values and measured
-metadata are in timings\_analysis/optimization\_summary.json.}
-\end{frame}
-
-\begin{frame}{PartTC: three performance groups}
-\renewcommand{\motivationtitlefont}{\normalsize\bfseries}
-\renewcommand{\motivationbodyfont}{\small}
-\renewcommand{\motivationpadding}{7pt}
-\renewcommand{\motivationgap}{7pt}
-\renewcommand{\motivationtextgap}{4pt}
-\vspace{8pt}
-\motivationcard{\textcolor{UHred}{24 datasets $\Uparrow$ Larger speedup ($>1.070\times$)}}
-  {Keep TC hash-partitioned as it grows: partition new output instead of repartitioning all accumulated TC.\par
-   \vspace{4pt}
-   \textbf{GRID150}: 300 iterations, \textbf{2.517$\times$}, saving \textbf{32.433 s}.\par
-   Iterations alone do not predict the gain: \textbf{t500} has 1 iteration yet reaches \textbf{3.641$\times$}. TODO: verify}{UHred!6}
-\motivationcard{\textcolor{red1}{16 datasets $\uparrow$ Small speedup ($1 < {}\mathrm{speedup}\leq 1.070\times$)}}
-  {}{UHblack!3}
-\motivationcard{\textcolor{UHblack!70}{2 datasets $\downarrow$ Small slowdown ($<1\times$)}}
-  {\textbf{u2000\_1000000}: 0.046 s; \textbf{u2000\_500000}: 0.037 s.\par
-   Both have only \textbf{2 iterations TODO: verify}.}{UHblack!3}
-\note{PartTC keeps accumulated TC hash-partitioned and partitions new output,
-as introduced in the implementation slides. Avoiding repeated repartitioning
-is a mechanism-based interpretation, not an established runtime cost breakdown.
-GRID150 has 131,675,775 closure pairs and 300 productive iterations; its CSV
-runtimes are 53.811 s with AAJ and 21.378 s with PartTC (2.517x).
-p1000 has 999 iterations and 499,500 closure pairs; 37.620 s becomes 30.649 s,
-saving 6.971 s (1.227x). Long-iteration graphs are among the beneficiaries,
-but the largest relative gain, t500, has only one iteration: 0.375 s
-becomes 0.103 s (3.641x, saving 0.272 s). The final empty round is excluded
-from the metadata iteration count. Do not infer an exact selection condition
-from iteration count alone. The larger-gain group also contains shallow trees,
-random graphs, and Wikidata graphs.
-The two regressions are u2000\_1000000: 16.535 to 16.581 s (0.997x), and
-u2000\_500000: 7.576 to 7.613 s (0.995x). Both have two productive iterations
-and four million closure pairs. These small differences have no significance
-test; repeat-level variability is unavailable in the CSV. The closure-derived
-metadata come from dataset\_metadata/tc\_datasets\_measured.csv in benchmark\_runner.}
-\end{frame}
-
-% Slides 18--19: combined Edge+AAJ+PartTC effect versus unoptimized Base.
-\begin{frame}{Combined: gains on all measured datasets}
+% Results overview: combined Edge+AAJ+PartTC effect versus unoptimized Base.
+\begin{frame}{All optimizations: gains across datasets}
 \vspace{8pt}
 {\small
 \begin{tabular*}{\textwidth}{@{}l@{\extracolsep{\fill}}ll@{}}
@@ -1032,7 +892,7 @@ Repeat-level uncertainty is unavailable; no formal significance test is made.
 Detailed ratios and measured metadata are in timings\_analysis/optimization\_summary.json.}
 \end{frame}
 
-\begin{frame}{Combined: complementary optimizations}
+\begin{frame}{Overall gains: different graphs benefit}
 \renewcommand{\motivationtitlefont}{\normalsize\bfseries}
 \renewcommand{\motivationbodyfont}{\small}
 \renewcommand{\motivationpadding}{7pt}
@@ -1067,82 +927,365 @@ tc\_datasets\_measured.csv. Closure-derived characteristics require estimation
 or sampling for optimizer decisions before execution.}
 \end{frame}
 
-\section{TODO: rest van de presentatie}
-\begin{frame}
-\frametitle{My first frametitle}
-Welcome to this DSI Latex Beamer template!
-\vspace{2cm}
-\\You can adjust the view of the section titles to repeating the table of contents with the current section highlighted. For this, follow the steps in line 316 of beamerthemeDSI.sty.
+% Bridge from total speedup to incremental contributions.
+\begin{frame}{Which optimization causes the speedup?}
+\vspace{8pt}
+{\small\bfseries Ablation study: add one optimization at a time\par}
+\vspace{10pt}
+\centering
+\begin{tikzpicture}[text=UHblack,
+  stage/.style={draw=UHblack!20,fill=UHblack!3,rounded corners=4pt,
+    minimum width=2.5cm,minimum height=0.8cm,font=\small\bfseries},
+  contribution flow/.style={-latex,UHred,line width=1.2pt}]
+  \node[stage] (contribbase) at (0,0) {Base};
+  \node[stage,fill=UHred!6] (contribedge) at (3.4,0) {+ Edge};
+  \node[stage,fill=UHred!6] (contribaaj) at (6.8,0) {+ AAJ};
+  \node[stage,fill=UHred!6] (contribpart) at (10.2,0) {+ PartTC};
+  \draw[contribution flow] (contribbase) -- (contribedge);
+  \draw[contribution flow] (contribedge) -- (contribaaj);
+  \draw[contribution flow] (contribaaj) -- (contribpart);
+\end{tikzpicture}
+\par\vspace{10pt}
+{\small Each step compares consecutive configurations. Their speedups multiply to the total gain.\par}
+\vspace{12pt}
+{\small
+\renewcommand{\arraystretch}{1.8}
+\begin{tabular*}{0.92\textwidth}{@{}l@{\extracolsep{\fill}}rrrr@{}}
+    \textbf{Dataset} & \textbf{Edge} & \textbf{AAJ} & \textbf{PartTC} & \textbf{Combined}\\
+    \hline
+    P131 & \textcolor{UHred}{\textbf{1.983$\times$}} & 1.105$\times$ & 1.189$\times$ & 2.604$\times$\\
+    G5K & 0.994$\times$ & \textcolor{UHred}{\textbf{1.187$\times$}} & 1.118$\times$ & 1.320$\times$\\
+    GRID150 & 0.999$\times$ & 1.053$\times$ & \textcolor{UHred}{\textbf{2.517$\times$}} & 2.649$\times$\\
+\end{tabular*}\par}
+\vspace{10pt}
+{\small\bfseries Different graphs benefit from different optimizations.\par}
+\note{These are ratios of the reported CSV timings for the same dataset and
+Run ID. Edge = Base / Base+Edge; AAJ = Base+Edge / Base+Edge+AAJ;
+PartTC = Base+Edge+AAJ / Base+Edge+AAJ+PartTC. Their exact product equals
+Base / Base+Edge+AAJ+PartTC. Displayed values are rounded to three decimals.
+The highlighted cell is the largest incremental speedup for each illustrated
+dataset; it does not imply that the other optimizations have no effect.
+This comparison is conditional on the order of addition, rather than a full
+factorial analysis of independent effects or interactions. We next inspect
+Edge, AAJ and PartTC in that order, showing each contribution and the graph
+characteristics associated with its larger gains.}
+\end{frame}
+
+% Individual contribution: add Edge to Base.
+\begin{frame}{Adding Edge: large gains for six datasets}
+\vspace{8pt}
+{\small
+\begin{tabular*}{\textwidth}{@{}l@{\extracolsep{\fill}}ll@{}}
+  \textcolor{UHred}{\textbf{6 datasets} $\Uparrow$ large speedup} &
+  \textcolor{red1}{\textbf{28 datasets} $\uparrow$ small speedup} &
+  \textcolor{UHblack!70}{\textbf{8 datasets} $\downarrow$ small slowdown}
+\end{tabular*}\par}
+\vspace{4pt}
+\makebox[\textwidth][c]{\includegraphics[width=0.96\textwidth]{charts/edge_speedup_condensed_vertical.pdf}}
+\note{The supplied chart compares the exact timings.csv columns datafusion-Base
+and datafusion-Base-Edge within each benchmark row and Run ID. It uses reported
+CSV values without further aggregation, rather than recomputing medians from
+repeat-level events. There are 42 paired positive timings and 12 unavailable
+or invalid pairs. Speedup is Base runtime divided by Base-Edge runtime:
+1x is equal runtime, above 1x favors Base-Edge, and below 1x is a regression.
+The six largest speedups are P131 (1.983x), b19 (1.503x), b18 (1.439x),
+b17 (1.298x), TREE11 (1.200x), and P279 (1.153x).
+The hatched interval bar spans exactly 1.001x to 1.043x and represents 28
+datasets in that inclusive range. It is not a mean, sum, or measured group
+speedup. Eight datasets have speedups below 1x.
+Repeat-level timings and uncertainty are not provided in the chart's CSV source.
+Original chart: /home/olaf/PhD/research/timings\_analysis/charts/base\_to\_edge/edge\_speedup\_condensed\_vertical.pdf.}
+\end{frame}
+
+% Explain when Edge reuse helps.
+\begin{frame}{When does Edge reuse help most?}
+\renewcommand{\motivationtitlefont}{\normalsize\bfseries}
+\renewcommand{\motivationbodyfont}{\small}
+\renewcommand{\motivationpadding}{7pt}
+\renewcommand{\motivationgap}{7pt}
+\renewcommand{\motivationtextgap}{4pt}
+\vspace{8pt}
+\motivationcard{\textcolor{UHred}{6 datasets $\Uparrow$ Large speedup ($\geq 1.153\times$)}}
+  {\textbf{\textbar edge\textbar\ $\geq 50{,}000$ \quad AND \quad rule instances / \textbar edge\textbar\ $\leq 32$}\par
+   \vspace{5pt}
+   Reusing a large edge hash table saves more work. The speedup is substantial
+   when this saving is large relative to candidate processing.}{UHred!6}
+\motivationcard{\textcolor{red1}{28 datasets $\uparrow$ Small speedup (1.001--1.043$\times$)}}
+  {}{UHblack!3}
+\motivationcard{\textcolor{UHblack!70}{8 datasets $\downarrow$ Small slowdown ($< 1\times$)}}
+  {Slowdowns are tiny in absolute time.\par
+   \textbf{m4\_2048}, the largest relative slowdown, adds only
+   \textbf{0.001 second (1 ms)}.}{UHblack!3}
+\note{The rule edge >= 50,000 AND rule\_instances / edge <= 32 selects
+exactly TREE11, b17, b18, b19, P131 and P279 out of the 54 datasets.
+The chart's three groups are six large speedups, 28 small speedups, and eight
+small slowdowns. The largest relative slowdown, m4\_2048, adds only 0.001 second
+(1 millisecond) in absolute runtime.
+Rule instances count logical rule-body matches, including candidates later
+discarded; dividing by edge count measures candidate-generation work per input
+edge. The measured metadata (edge; edge/nodes; iterations; rule instances/edge)
+are: TREE11 (71,263; 1.00; 11; 10.37), b17 (131,070; 1.00; 16; 15.00),
+b18 (262,142; 1.00; 17; 16.00), b19 (524,286; 1.00; 18; 17.00),
+P131 (10,596,936; 1.05; 8; 3.92), P279 (3,127,933; 1.23; 22; 28.72).
+The speedups on the Edge results chart use the reported CSV timings, as documented in that
+chart, without repeat-level uncertainty or a formal significance test.
+Comparing Base.json and Base+Edge.json, the only plan difference is a recursive
+HASHJOIN becoming REUSEEDBHASHJOIN. Saving edge hash builds is a mechanism-based
+interpretation; timings alone do not establish the cost breakdown.
+Dense k1000 and long-path p1000 illustrate high candidate work. Small, shallow
+m4\_2048 has little hash-building work to save. P40 is large and sparse but has
+approximately 2,171 rule instances per edge and 127 iterations; its runs timed
+out, so its speedup cannot be assessed.
+An alternative descriptive rule, nodes >= 50,000 AND iterations <= 32, also
+selects exactly these six: large, sparse graphs with shallow reachability.
+The group includes cyclic and acyclic graphs and very different maximum
+degrees, so cyclicity and maximum degree are weaker discriminators.
+Both rules fit this benchmark collection; numerical thresholds require
+validation on additional datasets. Rule instances and iterations are
+closure-derived and would require estimates or sampling before execution.}
+\end{frame}
+
+% Individual contribution: add AAJ to Base+Edge.
+\begin{frame}{Adding AAJ: mostly small gains}
+\vspace{8pt}
+{\small
+\begin{tabular*}{\textwidth}{@{}l@{\extracolsep{\fill}}ll@{}}
+  \textcolor{UHred}{\textbf{4 datasets} $\Uparrow$ larger speedup} &
+  \textcolor{red1}{\textbf{37 datasets} $\uparrow$ small speedup} &
+  \textcolor{UHblack!70}{\textbf{1 dataset} $\downarrow$ small slowdown}
+\end{tabular*}\par}
+\vspace{4pt}
+\makebox[\textwidth][c]{\includegraphics[width=0.96\textwidth]{timings_analysis/charts/edge_to_aaj/edge_speedup_condensed_vertical.pdf}}
+\note{Generated with timings\_analysis/plot\_timings.py from timings.csv.
+This is the incremental AAJ comparison: Base+Edge divided by Base+Edge+AAJ,
+not Base divided by Base+Edge+AAJ. There are 42 valid pairs and 12 exclusions.
+Four speedups exceed 1.062: G5K 1.187x, G10K 1.137x,
+P131 1.105x, P279 1.086x. The 37 other gains include 36 in the
+hatched 1.001--1.062 interval and m256\_32 at approximately 1.0004x, displayed separately
+and rounded to 1.000x. TREE11 is the only slowdown, 0.984848485x.
+The hatched bar is a range, not an average. No significance test is available.
+Joined timings and measured metadata are in timings\_analysis/optimization\_summary.json.}
+\end{frame}
+
+\begin{frame}{When does AAJ help most?}
+\renewcommand{\motivationtitlefont}{\normalsize\bfseries}
+\renewcommand{\motivationbodyfont}{\small}
+\renewcommand{\motivationpadding}{7pt}
+\renewcommand{\motivationgap}{7pt}
+\renewcommand{\motivationtextgap}{4pt}
+\vspace{8pt}
+\motivationcard{\textcolor{UHred}{4 datasets $\Uparrow$ Larger speedup ($>1.062\times$)}}
+  {$|TC|$ / productive rounds $\geq 2{,}000{,}000$ \quad AND \quad rule instances / $|TC|$ $\leq 32$\par
+   \vspace{5pt}
+   AAJ shares hashing work between deduplication and anti join.
+   A large TC makes separate anti-join hashing expensive; candidate processing can dilute the saving.}{UHred!6}
+\motivationcard{\textcolor{red1}{37 datasets $\uparrow$ Small speedup ($1 < {}\mathrm{speedup}\leq 1.062\times$)}}
+  {}{UHblack!3}
+\motivationcard{\textcolor{UHblack!70}{1 dataset $\downarrow$ Small slowdown ($<1\times$)}}
+  {\textbf{TREE11}: 0.985$\times$, adding only \textbf{0.001 second (1 ms)}.}{UHblack!3}
+\note{The candidate metadata rule TC size / productive rounds >= 2,000,000
+AND rule instances / TC size <= 32 selects exactly G5K, G10K, P131 and P279
+among the 42 datasets with valid AAJ timings, with no false positives or
+false negatives in this collection. Across all 54 metadata records it also
+selects P40, whose timed-out runs prevent speedup assessment. This replaces
+the previous large-closure/shallow-recursion condition with average useful
+output per round and candidate amplification. Productive rounds include the
+initial edge-derived result and exclude the final empty result. Average new
+TC pairs per round and rule instances per TC pair are respectively G5K
+(2.248 million; 5.008), G10K (14.286 million; 9.981), P131 (4.981 million;
+1.042), and P279 (3.534 million; 1.156). Both this and the previous condition
+fit the measured collection; improved out-of-sample prediction is not established.
+Their (TC size; iterations) are G5K (24,730,729; 11), G10K (100,000,000; 7),
+P131 (39,845,940; 8), P279 (77,740,410; 22).
+GRID150 is an important counterexample to closure size alone: 131,675,775 pairs,
+300 iterations, but only 1.053x AAJ speedup. Dense k2000 discards about 99.9 percent
+of candidates in aggregation but gains only 1.018x, so duplicate fraction alone
+does not identify the larger gains. These are descriptive associations, not a
+validated optimizer rule or a measured cost breakdown. AAJ combines the
+deduplication and anti-join work as introduced earlier in this deck.
+The closure-derived metadata would require estimates or sampling before execution.
+TREE11's CSV runtimes are 0.065 s with Edge and 0.066 s with AAJ.
+No repeat-level uncertainty or significance test is available.}
+\end{frame}
+
+% Individual contribution: add PartTC to Base+Edge+AAJ.
+\begin{frame}{Adding PartTC: gains across many datasets}
+\vspace{8pt}
+{\small
+\begin{tabular*}{\textwidth}{@{}l@{\extracolsep{\fill}}ll@{}}
+  \textcolor{UHred}{\textbf{24 datasets} $\Uparrow$ larger speedup} &
+  \textcolor{red1}{\textbf{16 datasets} $\uparrow$ small speedup} &
+  \textcolor{UHblack!70}{\textbf{2 datasets} $\downarrow$ small slowdown}
+\end{tabular*}\par}
+\vspace{4pt}
+\makebox[\textwidth][c]{\includegraphics[width=0.96\textwidth]{timings_analysis/charts/aaj_to_parttc/edge_speedup_condensed_vertical.pdf}}
+\note{Generated with timings\_analysis/plot\_timings.py from timings.csv.
+This is the incremental PartTC comparison: Base+Edge+AAJ divided by
+Base+Edge+AAJ+PartTC. There are 42 valid pairs and 12 exclusions.
+24 speedups exceed 1.070. The 16 smaller gains include 15 datasets in the
+hatched 1.001--1.070 range and k1000 at approximately 1.0008x, displayed separately
+and rounded to 1.001x. Its unrounded value falls below the condensed interval.
+Two datasets regress: u2000\_1000000 and u2000\_500000.
+The range bar is not an average. All ratios use reported CSV timings without
+further aggregation or repeat-level uncertainty. Detailed values and measured
+metadata are in timings\_analysis/optimization\_summary.json.}
+\end{frame}
+
+\begin{frame}{When does PartTC help most?}
+\renewcommand{\motivationtitlefont}{\normalsize\bfseries}
+\renewcommand{\motivationbodyfont}{\small}
+\renewcommand{\motivationpadding}{7pt}
+\renewcommand{\motivationgap}{7pt}
+\renewcommand{\motivationtextgap}{4pt}
+\vspace{8pt}
+\motivationcard{\textcolor{UHred}{24 datasets $\Uparrow$ Larger speedup ($>1.070\times$)}}
+  {$|TC|\geq 100{,}000$ \quad AND \quad iterations $\geq 16$\par
+   Selects \textbf{16 of the 24} larger gains\par
+   \vspace{4pt}
+   Reusing TC partitions avoids repeating work as TC grows over many iterations.
+   % Other graphs benefit too: \textbf{t500} reaches \textbf{3.641$\times$} with 1 iteration.
+  }{UHred!6}
+\motivationcard{\textcolor{red1}{16 datasets $\uparrow$ Small speedup ($1 < {}\mathrm{speedup}\leq 1.070\times$)}}
+  {}{UHblack!3}
+\motivationcard{\textcolor{UHblack!70}{2 datasets $\downarrow$ Small slowdown ($<1\times$)}}
+  {\textbf{u2000\_1000000}: 0.046 s; \textbf{u2000\_500000}: 0.037 s.\par
+   Both have only \textbf{2 iterations}.}{UHblack!3}
+\note{The descriptive rule TC size >= 100,000 AND iterations >= 16 selects
+16 of the 24 speedups above 1.070x among the 42 valid PartTC comparisons,
+with zero false positives and eight false negatives. It describes a subset
+of the larger gains, not a necessary condition for benefit. Iterations use
+the metadata convention: include the initial edge-derived result and exclude
+the final empty result. The thresholds are fitted to this benchmark collection
+and require independent validation. Closure-derived inputs need estimates
+or sampling before execution. Detailed checks are in
+timings\_analysis/parttc\_classifier\_candidates.csv.
+PartTC keeps accumulated TC hash-partitioned and partitions new output,
+as introduced in the implementation slides. Avoiding repeated repartitioning
+is a mechanism-based interpretation, not an established runtime cost breakdown.
+GRID150 has 131,675,775 closure pairs and 300 productive iterations; its CSV
+runtimes are 53.811 s with AAJ and 21.378 s with PartTC (2.517x).
+p1000 has 999 iterations and 499,500 closure pairs; 37.620 s becomes 30.649 s,
+saving 6.971 s (1.227x). Long-iteration graphs are among the beneficiaries,
+but the largest relative gain, t500, has only one iteration: 0.375 s
+becomes 0.103 s (3.641x, saving 0.272 s). The final empty round is excluded
+from the metadata iteration count. Do not infer an exact selection condition
+from iteration count alone. The larger-gain group also contains shallow trees,
+random graphs, and Wikidata graphs.
+The two regressions are u2000\_1000000: 16.535 to 16.581 s (0.997x), and
+u2000\_500000: 7.576 to 7.613 s (0.995x). Both have two productive iterations
+and four million closure pairs. These small differences have no significance
+test; repeat-level variability is unavailable in the CSV. The closure-derived
+metadata come from dataset\_metadata/tc\_datasets\_measured.csv in benchmark\_runner.}
+\end{frame}
+
+\begin{frame}{Takeaway: optimization impact depends strongly on the dataset}
+\renewcommand{\motivationtitlefont}{\small\bfseries}
+\renewcommand{\motivationbodyfont}{\footnotesize}
+\renewcommand{\motivationpadding}{6pt}
+\renewcommand{\motivationgap}{5pt}
+\renewcommand{\motivationtextgap}{3pt}
+\vspace{3pt}
+{\large\bfseries\color{UHblack}Signs a workload may benefit:\par}
+\vspace{5pt}
+\motivationcard{Edge reuse: large edge table, little candidate work per edge}
+  {\textbar edge\textbar\ $ \geq$  $50{,}000$ and rule instances $/$ \textbar edge\textbar\   $\leq$  32 marked all six large speedups.}{UHred!6}
+\motivationcard{AAJ: many accumulated pairs, modest candidate amplification}
+  {$|TC|$ / round $\geq$  2M and rule instances $/$ $|TC|\leq 32$ marked the four large gains.}{UHred!6}
+\motivationcard{PartTC: large closure with many iterations}
+  {$|TC|\geq 100$K and iterations $\geq 16$ marked 16 of 24 larger gains.}{UHred!6}
+\vspace{3pt}
+{\footnotesize\color{UHblack!75}
+Combined, the optimizations improved all 42 datasets.}
+\note{The metadata rules summarize patterns in this benchmark collection. The
+Edge rule selected exactly six datasets with large speedups. The AAJ rule
+selected four larger gains among valid timings; it also selects P40, whose
+runs timed out. The PartTC rule selected a subset (16 of 24) of larger gains;
+it is not necessary for benefit (for example, t500 benefits with one iteration).
+The combined configuration improved all 42 datasets with valid timings.
+Thresholds require validation on additional datasets, and closure-derived
+metadata may need estimation or sampling before execution.}
 \end{frame}
 
 \begin{frame}
-You can also leave out a frametitle. The primary colors that you can use are
-\begin{itemize}
-\item \textcolor{UHred}{UHred}
-\item \textcolor{UHblack}{UHblack}
-\item \colorbox{UHblack}{\textcolor{UHwhite}{UHwhite}}
-\end{itemize}
-
-The secondary colors are 
-\begin{itemize}
-\item \textcolor{red1}{red1}
-\item \textcolor{red2}{red2}
-\item \textcolor{red3}{red3}
-\item \textcolor{red4}{red4}
-\end{itemize}
+\centering
+{\LARGE\color{UHred}\bfseries Thank you for your attention!\par}
+\vspace{0.8cm}
+{\Large Any questions?\par}
 \end{frame}
 
-\begin{frame}{Itemization}
-\begin{itemize}
-\item Item 1
-\item Item 2
-\begin{itemize}
-\item Item 2.1
-\item Item 2.2
-\end{itemize}
-\item Item 3
-\end{itemize}
+% Blank white separator before the two retained backup slides.
+{
+\setbeamertemplate{headline}{}
+\setbeamertemplate{footline}{}
+\setbeamertemplate{sidebar canvas right}{}
+\setbeamertemplate{sidebar canvas left}{}
+\begin{frame}[plain,noframenumbering]
+\null
 \end{frame}
+}
 
-\begin{frame}{Enumeration}
-\begin{enumerate}
-\item Item 1
-\item Item 2
-\begin{enumerate}
-\item Item 2.1
-\item Item 2.2
-\end{enumerate}
-\item Item 3
-\end{enumerate}
-\end{frame}
+% Retained at the end as an optional explanation of Hash Repartition.
+\begin{frame}{Hash Repartition operator}
+\centering
+\begin{tikzpicture}[text=UHblack,
+  chunk/.style={draw=UHblack!35,fill=UHblack!3,rounded corners=3pt,
+    minimum width=1.9cm,minimum height=1.15cm,font=\normalsize},
+  flow/.style={-latex,draw=UHblack!65,line width=1pt}]
+  \draw[UHblack!65,line width=0.9pt]
+    (-0.95,3.1) -- (-0.95,3.35) -- (10.15,3.35) -- (10.15,3.1);
+  \node[anchor=south,font=\large] at (4.6,3.45)
+    {$TC = \displaystyle\bigcup_{k=0}^{i} \delta TC_{k}$};
+  \node[chunk] (partitioninputzero) at (0,2.25) {$\delta TC_{0}$};
+  \node[chunk] (partitioninputone) at (2.3,2.25) {$\delta TC_{1}$};
+  \node[chunk] (partitioninputtwo) at (4.6,2.25) {$\delta TC_{2}$};
+  \node[font=\Large] at (6.9,2.25) {$\cdots$};
+  \node[chunk] (partitioninputlast) at (9.2,2.25) {$\delta TC_{i}$};
+  \node[draw=UHred,fill=UHred!6,rounded corners=3pt,
+    anchor=east,align=center,font=\small,inner sep=5pt] at (-0.8,0.65)
+    {Hash Repartition\\operator};
 
-\section{Section 2: Blocks}
-
-\subsection{Normal block}
-\begin{frame}
-Here is a normal block:
-
-\begin{block}{Block title}
-block body
-\end{block}
-\end{frame}
-
-\subsection{Example block}
-\begin{frame}
-Here is an example block:
-
-\begin{exampleblock}{Block title}
-block body
-\end{exampleblock}
+  % Each color identifies one output partition.
+  \foreach \partitionindex/\partitionx/\partitioncolor/\sourceoffset in
+    {0/0.6/blue/-12pt,1/4.6/teal/0pt,2/8.6/orange/12pt} {
+    \node[draw=\partitioncolor!75!black,fill=\partitioncolor!9,
+      rounded corners=4pt,minimum width=2.65cm,minimum height=1.5cm,
+      font=\small,text=\partitioncolor!65!black]
+      (outputpartition\partitionindex) at (\partitionx,-1.15)
+      {partition \partitionindex};
+    \foreach \sourcechunk/\targetoffset in
+      {partitioninputzero/-27pt,partitioninputone/-9pt,partitioninputtwo/9pt,partitioninputlast/27pt} {
+      \draw[-latex,draw=\partitioncolor!75!black,line width=1pt]
+        ([xshift=\sourceoffset]\sourcechunk.south)
+        --
+        ([xshift=\targetoffset]outputpartition\partitionindex.north);
+    }
+  }
+\end{tikzpicture}
 \end{frame}
 
 
-\subsection{Alert block}
-\begin{frame}
-Here is an alertblock:
+% Retained as a backup: original first version of TC in memory.
+\begin{frame}{TC in memory}
+\centering
+\begin{tikzpicture}[text=UHblack,
+  chunk/.style={draw=UHblack!35,fill=UHblack!3,rounded corners=3pt,
+    minimum width=1.9cm,minimum height=1.15cm,font=\large},
+  grouping/.style={draw=UHblack!65,line width=0.9pt}]
+  \node[chunk] (tcfirst) at (0,0) {$\delta TC_{0}$};
+  \node[chunk] at (2.3,0) {$\delta TC_{1}$};
+  \node[chunk] at (4.6,0) {$\delta TC_{2}$};
+  \node[font=\Large] at (6.9,0) {$\cdots$};
+  \node[chunk,draw=UHred,fill=UHred!10] (tclast) at (9.2,0) {$\delta TC_{i}$};
 
-\begin{alertblock}{Block title}
-block body
-\end{alertblock}
+  \draw[grouping] (-0.95,0.85) -- (-0.95,1.1) -- (10.15,1.1) -- (10.15,0.85);
+  \node[anchor=south,font=\large] at (4.6,1.2)
+    {$TC = \displaystyle\bigcup_{k=0}^{i} \delta TC_{k}$};
+
+  \draw[UHred,line width=0.9pt] (8.25,-0.85) -- (8.25,-1.1)
+    -- (10.15,-1.1) -- (10.15,-0.85);
+  \node[anchor=north,font=\large,text=UHred] at (9.2,-1.2)
+    {$\delta TC = \delta TC_{i}$};
+\end{tikzpicture}
 \end{frame}
+
 \end{document}
