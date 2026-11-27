@@ -973,15 +973,23 @@ characteristics associated with its larger gains.}
 
 % Individual contribution: add Edge to Base.
 \begin{frame}{Adding Edge: large gains for six datasets}
-\vspace{8pt}
-{\small
-\begin{tabular*}{\textwidth}{@{}l@{\extracolsep{\fill}}ll@{}}
-  \textcolor{UHred}{\textbf{6 datasets} $\Uparrow$ large speedup} &
-  \textcolor{red1}{\textbf{28 datasets} $\uparrow$ small speedup} &
-  \textcolor{UHblack!70}{\textbf{8 datasets} $\downarrow$ small slowdown}
-\end{tabular*}\par}
-\vspace{4pt}
-\makebox[\textwidth][c]{\includegraphics[width=0.96\textwidth]{charts/edge_speedup_condensed_vertical.pdf}}
+\begin{columns}[c,onlytextwidth]
+\begin{column}{0.58\textwidth}
+\centering
+\includegraphics[width=0.9\linewidth]{timings_analysis/charts/base_to_edge/speedup_scatter.pdf}
+\end{column}
+\begin{column}{0.40\textwidth}
+\renewcommand{\motivationtitlefont}{\small\bfseries}
+\renewcommand{\motivationbodyfont}{\footnotesize}
+\renewcommand{\motivationpadding}{7pt}
+\motivationcard{\textcolor{UHred}{6 datasets: large speedup\\($\geq 1.153\times$)}}
+  {\textbar edge\textbar\ $\geq 50{,}000$\\
+   AND rule instances / \textbar edge\textbar\ $\leq 32$\par
+   \vspace{6pt}
+   Reusing a large edge hash table saves more work. The speedup is substantial
+   when this saving is large relative to candidate processing.}{UHred!6}
+\end{column}
+\end{columns}
 \note{The supplied chart compares the exact timings.csv columns datafusion-Base
 and datafusion-Base-Edge within each benchmark row and Run ID. It uses reported
 CSV values without further aggregation, rather than recomputing medians from
@@ -990,11 +998,13 @@ or invalid pairs. Speedup is Base runtime divided by Base-Edge runtime:
 1x is equal runtime, above 1x favors Base-Edge, and below 1x is a regression.
 The six largest speedups are P131 (1.983x), b19 (1.503x), b18 (1.439x),
 b17 (1.298x), TREE11 (1.200x), and P279 (1.153x).
-The hatched interval bar spans exactly 1.001x to 1.043x and represents 28
-datasets in that inclusive range. It is not a mean, sum, or measured group
-speedup. Eight datasets have speedups below 1x.
+The scatterplot shows every valid pair separately; the horizontal line at 1x represents
+equal runtime, and points above it favor Edge. Runtime uses a logarithmic x axis;
+speedup uses a linear y axis. Twenty-eight datasets have
+speedups from 1.001x to 1.043x; eight datasets have speedups below 1x.
 Repeat-level timings and uncertainty are not provided in the chart's CSV source.
-Original chart: /home/olaf/PhD/research/timings\_analysis/charts/base\_to\_edge/edge\_speedup\_condensed\_vertical.pdf.}
+The metadata rule selects TREE11, b17, b18, b19, P131 and P279.
+Chart: timings\_analysis/charts/base\_to\_edge/speedup\_scatter.pdf.}
 \end{frame}
 
 % Explain when Edge reuse helps.
@@ -1047,15 +1057,23 @@ closure-derived and would require estimates or sampling before execution.}
 
 % Individual contribution: add AAJ to Base+Edge.
 \begin{frame}{Adding AAJ: mostly small gains}
-\vspace{8pt}
-{\small
-\begin{tabular*}{\textwidth}{@{}l@{\extracolsep{\fill}}ll@{}}
-  \textcolor{UHred}{\textbf{4 datasets} $\Uparrow$ larger speedup} &
-  \textcolor{red1}{\textbf{37 datasets} $\uparrow$ small speedup} &
-  \textcolor{UHblack!70}{\textbf{1 dataset} $\downarrow$ small slowdown}
-\end{tabular*}\par}
-\vspace{4pt}
-\makebox[\textwidth][c]{\includegraphics[width=0.96\textwidth]{timings_analysis/charts/edge_to_aaj/edge_speedup_condensed_vertical.pdf}}
+\begin{columns}[c,onlytextwidth]
+\begin{column}{0.58\textwidth}
+\centering
+\includegraphics[width=0.9\linewidth]{timings_analysis/charts/edge_to_aaj/speedup_scatter.pdf}
+\end{column}
+\begin{column}{0.40\textwidth}
+\renewcommand{\motivationtitlefont}{\small\bfseries}
+\renewcommand{\motivationbodyfont}{\footnotesize}
+\renewcommand{\motivationpadding}{7pt}
+\motivationcard{\textcolor{UHred}{4 datasets: larger speedup\\($>1.062\times$)}}
+  {$|TC|$ / productive rounds $\geq 2$M\\
+   AND rule instances / $|TC|$ $\leq 32$\par
+   \vspace{6pt}
+   AAJ shares hashing work between deduplication and anti join.
+   A large TC makes separate anti-join hashing expensive; candidate processing can dilute the saving.}{UHred!6}
+\end{column}
+\end{columns}
 \note{Generated with timings\_analysis/plot\_timings.py from timings.csv.
 This is the incremental AAJ comparison: Base+Edge divided by Base+Edge+AAJ,
 not Base divided by Base+Edge+AAJ. There are 42 valid pairs and 12 exclusions.
@@ -1063,7 +1081,9 @@ Four speedups exceed 1.062: G5K 1.187x, G10K 1.137x,
 P131 1.105x, P279 1.086x. The 37 other gains include 36 in the
 hatched 1.001--1.062 interval and m256\_32 at approximately 1.0004x, displayed separately
 and rounded to 1.000x. TREE11 is the only slowdown, 0.984848485x.
-The hatched bar is a range, not an average. No significance test is available.
+The scatterplot shows every valid pair, with logarithmic reference runtime on
+the x axis and linear speedup on the y axis. Above 1x favors AAJ.
+No significance test is available.
 Joined timings and measured metadata are in timings\_analysis/optimization\_summary.json.}
 \end{frame}
 
@@ -1110,15 +1130,23 @@ No repeat-level uncertainty or significance test is available.}
 
 % Individual contribution: add PartTC to Base+Edge+AAJ.
 \begin{frame}{Adding PartTC: gains across many datasets}
-\vspace{8pt}
-{\small
-\begin{tabular*}{\textwidth}{@{}l@{\extracolsep{\fill}}ll@{}}
-  \textcolor{UHred}{\textbf{24 datasets} $\Uparrow$ larger speedup} &
-  \textcolor{red1}{\textbf{16 datasets} $\uparrow$ small speedup} &
-  \textcolor{UHblack!70}{\textbf{2 datasets} $\downarrow$ small slowdown}
-\end{tabular*}\par}
-\vspace{4pt}
-\makebox[\textwidth][c]{\includegraphics[width=0.96\textwidth]{timings_analysis/charts/aaj_to_parttc/edge_speedup_condensed_vertical.pdf}}
+\begin{columns}[c,onlytextwidth]
+\begin{column}{0.58\textwidth}
+\centering
+\includegraphics[width=0.9\linewidth]{timings_analysis/charts/aaj_to_parttc/speedup_scatter.pdf}
+\end{column}
+\begin{column}{0.40\textwidth}
+\renewcommand{\motivationtitlefont}{\small\bfseries}
+\renewcommand{\motivationbodyfont}{\footnotesize}
+\renewcommand{\motivationpadding}{7pt}
+\motivationcard{\textcolor{UHred}{24 datasets: larger speedup\\($>1.070\times$)}}
+  {$|TC|\geq 100{,}000$\\
+   AND iterations $\geq 16$\par
+   Selects \textbf{16 of the 24} larger gains.\par
+   \vspace{6pt}
+   Reusing TC partitions avoids repeating work as TC grows over many iterations.}{UHred!6}
+\end{column}
+\end{columns}
 \note{Generated with timings\_analysis/plot\_timings.py from timings.csv.
 This is the incremental PartTC comparison: Base+Edge+AAJ divided by
 Base+Edge+AAJ+PartTC. There are 42 valid pairs and 12 exclusions.
@@ -1126,7 +1154,9 @@ Base+Edge+AAJ+PartTC. There are 42 valid pairs and 12 exclusions.
 hatched 1.001--1.070 range and k1000 at approximately 1.0008x, displayed separately
 and rounded to 1.001x. Its unrounded value falls below the condensed interval.
 Two datasets regress: u2000\_1000000 and u2000\_500000.
-The range bar is not an average. All ratios use reported CSV timings without
+The scatterplot shows every valid pair, with logarithmic reference runtime on
+the x axis and linear speedup on the y axis. Above 1x favors PartTC.
+All ratios use reported CSV timings without
 further aggregation or repeat-level uncertainty. Detailed values and measured
 metadata are in timings\_analysis/optimization\_summary.json.}
 \end{frame}

@@ -19,6 +19,7 @@
 *.run.xml
 *.dvi
 *.xdv
+*.pdf
 
 # Generated presentation PDF (keep source assets such as TitleBackground.pdf)
 /Beamer_test.pdf

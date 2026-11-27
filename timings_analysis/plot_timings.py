@@ -265,6 +265,29 @@ def plot_comparison(raw, source_name, output_root, config):
             "and limits. The dashed y=x line marks equal runtime; points below it favor the candidate. "
             "Red points indicate candidate speedup >= 1x; grey points indicate regressions. "
             "No datasets are condensed or aggregated in this scatter plot."))
+        # Show relative differences directly instead of compressing them near y=x.
+        fig, ax = plt.subplots(figsize=(8, 6.5), facecolor="white")
+        fig.subplots_adjust(left=0.15, right=0.97, bottom=0.16, top=0.96)
+        for spine in ax.spines.values():
+            spine.set_visible(False)
+        ax.set_xscale("log")
+        ax.set_ylim(min(0.95, data.speedup.min() - 0.04), data.speedup.max() + 0.08)
+        ax.grid(which="major", color="#e8e8e8", linewidth=0.6)
+        ax.set_axisbelow(True)
+        ax.axhline(1, color="#777875", linestyle="--", linewidth=1,
+                   label="Equal runtime", zorder=2)
+        ax.scatter(data[reference], data.speedup, s=38, c=bar_colors,
+                   edgecolors="white", linewidths=0.5, alpha=0.85, zorder=3)
+        ax.set_xlabel(f"{reference_label} runtime (seconds, log scale)", fontsize=13, labelpad=10)
+        ax.set_ylabel(f"Speedup ({reference_label} / {candidate_label})", fontsize=13, labelpad=10)
+        ax.yaxis.set_major_formatter(FuncFormatter(lambda value, _: f"{value:.2f}x"))
+        ax.tick_params(axis="both", which="both", length=0, labelsize=11)
+        ax.legend(loc="upper left", frameon=False, fontsize=11)
+        save_chart(fig, output_dir, "speedup_scatter", metadata(
+            "Speedup scatter plot", provenance +
+            " Each dataset is shown individually. X is reference runtime in seconds on a log scale; "
+            "y is speedup on a linear scale. The dashed horizontal line at 1x marks equal runtime. "
+            "Points above 1x favor the candidate. Red indicates speedup >= 1x, grey indicates regression."))
     grouped_count = data.speedup.between(lower, upper, inclusive="both").sum()
     print(f"{config['folder']}: {reference_label} / {candidate_label}; "
           f"{n} pairs, {int((data.speedup > 1).sum())} faster, "
